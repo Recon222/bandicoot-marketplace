@@ -1,0 +1,21 @@
+datetime,interaction,direction,correspondent_id,call_duration,antenna_id
+2014-03-02 07:13:30,call,out,contact_001,120,tower_001
+2014-03-02 08:45:00,text,in,contact_002,,tower_001
+2014-03-02 09:30:15,call,in,contact_001,45,tower_002
+2014-03-02 12:00:00,text,out,contact_003,,tower_002
+2014-03-02 14:22:30,call,out,contact_004,180,tower_001
+2014-03-02 16:45:00,text,in,contact_002,,tower_003
+2014-03-02 19:30:00,call,in,contact_005,90,tower_001
+2014-03-02 21:15:00,text,out,contact_001,,tower_001
+2014-03-03 08:00:00,call,out,contact_002,60,tower_002
+2014-03-03 10:30:00,text,in,contact_003,,tower_002
+2014-03-03 13:45:15,call,in,contact_001,150,tower_001
+2014-03-03 15:00:00,text,out,contact_004,,tower_003
+2014-03-03 17:30:00,call,out,contact_005,30,tower_002
+2014-03-03 20:00:00,text,in,contact_002,,tower_001
+2014-03-03 22:30:00,call,in,contact_001,200,tower_001
+2014-03-04 07:00:00,text,out,contact_003,,tower_002
+2014-03-04 09:15:00,call,out,contact_002,90,tower_001
+2014-03-04 11:30:00,text,in,contact_004,,tower_002
+2014-03-04 14:00:00,call,in,contact_001,75,tower_003
+2014-03-04 16:45:00,text,out,contact_005,,tower_001

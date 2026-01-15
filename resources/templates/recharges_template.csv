@@ -1,0 +1,2 @@
+datetime,amount,retailer_id
+YYYY-MM-DD HH:MM:SS,amount_value,retailer_id_here

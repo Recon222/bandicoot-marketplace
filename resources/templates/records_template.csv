@@ -1,0 +1,3 @@
+datetime,interaction,direction,correspondent_id,call_duration,antenna_id
+YYYY-MM-DD HH:MM:SS,call,out,contact_id,seconds,tower_id
+YYYY-MM-DD HH:MM:SS,text,in,contact_id,,tower_id
