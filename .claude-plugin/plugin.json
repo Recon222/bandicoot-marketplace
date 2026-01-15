@@ -1,0 +1,33 @@
+{
+  "name": "bandicoot",
+  "version": "1.0.0",
+  "description": "Mobile phone metadata analysis using Bandicoot - A Python toolbox for analyzing Call Detail Records (CDRs) to extract behavioral indicators from communication patterns, mobility, and social networks.",
+  "author": "Bandicoot Plugin Team",
+  "license": "MIT",
+  "commands": "./commands",
+  "skills": "./skills",
+  "agents": "./agents",
+  "hooks": "./hooks/hooks.json",
+  "keywords": [
+    "bandicoot",
+    "cdr",
+    "call-detail-records",
+    "mobile-phone",
+    "metadata",
+    "behavioral-analysis",
+    "mobility",
+    "social-network",
+    "spatial-analysis"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bandicoot/bandicoot-plugin"
+  },
+  "engines": {
+    "claude-code": ">=1.0.0"
+  },
+  "dependencies": {
+    "conda": "bandicoot",
+    "python": ">=2.7"
+  }
+}
