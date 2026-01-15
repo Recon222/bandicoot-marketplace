@@ -10,7 +10,6 @@
   "repository": "https://github.com/Recon222/bandicoot-marketplace",
   "commands": "./commands",
   "skills": "./skills",
-  "hooks": "./hooks/hooks.json",
   "keywords": [
     "bandicoot",
     "cdr",
