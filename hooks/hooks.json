@@ -1,25 +1,39 @@
 {
   "hooks": {
-    "validate-bandicoot-environment": {
-      "event": "pre-command",
-      "pattern": "bandicoot:*",
-      "command": "python",
-      "args": ["../skills/bandicoot-analysis/scripts/check-environment.py"],
-      "description": "Verify Bandicoot environment before running commands"
-    },
-    "validate-csv-output": {
-      "event": "post-command",
-      "pattern": "bandicoot:analyze*",
-      "command": "python",
-      "args": ["./validate-output.py"],
-      "description": "Validate generated CSV output files"
-    },
-    "validate-data-format": {
-      "event": "pre-command",
-      "pattern": "bandicoot:load",
-      "command": "python",
-      "args": ["./validate-input-data.py"],
-      "description": "Pre-validate data format before loading"
-    }
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python ../skills/bandicoot-analysis/scripts/check-environment.py",
+            "description": "Verify Bandicoot environment is properly configured at session start"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python ./validate-input-data.py",
+            "description": "Pre-validate data format before loading CSV files"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python ./validate-output.py",
+            "description": "Validate generated CSV output files after writing"
+          }
+        ]
+      }
+    ]
   }
 }
