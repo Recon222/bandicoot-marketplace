@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "bandicoot",
-      "source": ".",
+      "source": "./",
       "description": "A comprehensive Claude Code plugin for analyzing mobile phone metadata using Bandicoot. Includes commands for CDR analysis, skills for data preparation and result interpretation, and agents for complex workflows.",
       "version": "1.0.0",
       "author": {
