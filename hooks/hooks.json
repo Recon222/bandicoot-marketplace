@@ -1,29 +1,25 @@
 {
-  "hooks": [
-    {
-      "name": "validate-bandicoot-environment",
+  "hooks": {
+    "validate-bandicoot-environment": {
       "event": "pre-command",
       "pattern": "bandicoot:*",
       "command": "python",
       "args": ["../skills/bandicoot-analysis/scripts/check-environment.py"],
-      "description": "Verify Bandicoot environment before running commands",
-      "failOnError": true
+      "description": "Verify Bandicoot environment before running commands"
     },
-    {
-      "name": "validate-csv-output",
+    "validate-csv-output": {
       "event": "post-command",
       "pattern": "bandicoot:analyze*",
-      "script": "./validate-output.py",
-      "description": "Validate generated CSV output files",
-      "failOnError": false
+      "command": "python",
+      "args": ["./validate-output.py"],
+      "description": "Validate generated CSV output files"
     },
-    {
-      "name": "validate-data-format",
+    "validate-data-format": {
       "event": "pre-command",
       "pattern": "bandicoot:load",
-      "script": "./validate-input-data.py",
-      "description": "Pre-validate data format before loading",
-      "failOnError": false
+      "command": "python",
+      "args": ["./validate-input-data.py"],
+      "description": "Pre-validate data format before loading"
     }
-  ]
+  }
 }
