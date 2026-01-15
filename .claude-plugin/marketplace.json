@@ -1,0 +1,37 @@
+{
+  "name": "bandicoot-marketplace",
+  "owner": {
+    "name": "Bandicoot Contributors",
+    "email": "bandicoot@example.com"
+  },
+  "metadata": {
+    "description": "Claude Code plugin marketplace for Bandicoot - A Python toolbox for analyzing mobile phone metadata and Call Detail Records (CDRs).",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "bandicoot",
+      "source": ".",
+      "description": "A comprehensive Claude Code plugin for analyzing mobile phone metadata using Bandicoot. Includes commands for CDR analysis, skills for data preparation and result interpretation, and agents for complex workflows.",
+      "version": "1.0.0",
+      "author": {
+        "name": "Bandicoot Plugin Team",
+        "email": "bandicoot@example.com"
+      },
+      "homepage": "https://github.com/yvesalexandre/bandicoot",
+      "license": "MIT",
+      "keywords": [
+        "bandicoot",
+        "cdr",
+        "call-detail-records",
+        "mobile-phone",
+        "metadata",
+        "behavioral-analysis",
+        "mobility",
+        "social-network",
+        "spatial-analysis"
+      ],
+      "category": "data-analysis"
+    }
+  ]
+}

@@ -1,23 +1,25 @@
-# Bandicoot Claude Code Plugin
+# Bandicoot Claude Code Plugin & Marketplace
 
-A comprehensive Claude Code Skills plugin for analyzing mobile phone metadata using
+A comprehensive Claude Code plugin for analyzing mobile phone metadata using
 [Bandicoot](https://github.com/yvesalexandre/bandicoot), the Python toolbox for
 Call Detail Records (CDRs) analysis.
+
+This repository serves as both a **plugin** and a **marketplace** for easy distribution.
 
 ## Overview
 
 This plugin provides:
 
-- **Skills** - Auto-triggered contextual help for CDR analysis
-- **Commands** - Slash commands for specific analysis tasks
-- **Agents** - Multi-step workflows for complex analyses
+- **14 Commands** - Slash commands for data loading, analysis, and export
+- **3 Skills** - Auto-triggered contextual help for CDR analysis
+- **3 Agents** - Multi-step workflows for complex analyses
 - **Hooks** - Validation and quality assurance
 
 ## Installation
 
 ### Prerequisites
 
-1. **Python 3.7+** with Bandicoot installed:
+**Python 3.7+** with Bandicoot installed:
 
 ```bash
 # Create conda environment (recommended)
@@ -26,25 +28,21 @@ conda activate bandicoot
 
 # Install Bandicoot
 pip install bandicoot
-
-# Or install from source
-git clone https://github.com/yvesalexandre/bandicoot.git
-cd bandicoot
-pip install -e .
 ```
 
-2. **Claude Code** with plugin support
+### Install via Marketplace (Recommended)
 
-### Installing the Plugin
+In Claude Code:
 
-Copy the plugin directory to your Claude Code plugins location:
+```
+/plugin marketplace add YOUR-USERNAME/bandicoot-marketplace
+/plugin install bandicoot@bandicoot-marketplace
+```
 
-```bash
-# Copy to project
-cp -r bandicoot-plugin /path/to/your/project/.claude-plugins/bandicoot
+### Verify Installation
 
-# Or symlink for development
-ln -s /path/to/bandicoot-plugin /path/to/project/.claude-plugins/bandicoot
+```
+/bandicoot:validate
 ```
 
 ## Quick Start
