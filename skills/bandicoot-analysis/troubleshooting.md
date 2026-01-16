@@ -3,6 +3,11 @@
 Comprehensive guide for diagnosing and resolving common issues when working with
 Bandicoot.
 
+**Note on diagnostic code**: The code snippets in this guide are for
+diagnosing problems inline. Run them directly via `conda run -n bandicoot
+python -c "..."` to investigate issues. Do not create diagnostic wrapper
+scripts - diagnose, fix the root cause, then run Bandicoot normally.
+
 ## Environment Issues
 
 ### ImportError: No module named 'bandicoot'
