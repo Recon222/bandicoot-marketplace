@@ -17,242 +17,130 @@ Start the interactive D3.js visualization dashboard or export static visualizati
 - `--export`: Export static files instead of running server
 - `--output`: Export directory (default: `{user_id}_viz/`)
 
-## Execution
+## How to Run
 
-Execute the following Python code inline using `conda run -n bandicoot python -c "..."`.
-Do not save this as a separate script file.
-
-### Option 1: Run Interactive Dashboard
-
-```python
-import bandicoot as bc
-
-user_id = '{user_id}'
-records_path = '{records_path}'
-antennas_path = '{antennas_path}' if '{antennas_path}' else None
-port = {port} if {port} else 4242
-
-# Load user
-print(f"Loading user: {user_id}")
-user = bc.read_csv(
-    user_id,
-    records_path,
-    antennas_path,
-    describe=True,
-    warnings=True
-)
-
-print(f"\n{'=' * 50}")
-print("Starting Bandicoot Visualization Dashboard")
-print('=' * 50)
-print(f"\nServer starting on port {port}")
-print(f"Open your browser to: http://localhost:{port}")
-print(f"\nPress Ctrl+C to stop the server")
-print('=' * 50)
-
-# Start visualization server
-bc.visualization.run(user, port=port)
+Execute commands using:
 ```
+conda run -n bandicoot python -c "import bandicoot as bc; <commands>"
+```
+
+Do NOT create script files. Run commands inline and read the output.
+
+## Visualization Commands
+
+| Command | Purpose |
+|---------|---------|
+| `bc.visualization.run(user, port=4242)` | Start interactive dashboard |
+| `bc.visualization.export(user, 'output_dir/')` | Export static files |
+
+## Workflow
+
+### Option 1: Interactive Dashboard
+
+```
+user = bc.read_csv('user_id', 'path/')
+bc.visualization.run(user, port=4242)
+```
+
+Open browser to `http://localhost:4242`. Press Ctrl+C to stop.
 
 ### Option 2: Export Static Files
 
-```python
-import bandicoot as bc
-import os
-
-user_id = '{user_id}'
-records_path = '{records_path}'
-antennas_path = '{antennas_path}' if '{antennas_path}' else None
-output_dir = '{output}' if '{output}' else f'{user_id}_viz'
-
-# Load user
-print(f"Loading user: {user_id}")
-user = bc.read_csv(
-    user_id,
-    records_path,
-    antennas_path,
-    describe=True,
-    warnings=True
-)
-
-print(f"\nExporting visualization to: {output_dir}")
-
-# Export static files
-path = bc.visualization.export(user, output_dir)
-
-print(f"\n{'=' * 50}")
-print("Visualization Export Complete")
-print('=' * 50)
-print(f"\nFiles exported to: {path}")
-print(f"\nTo view the visualization:")
-print(f"  1. Navigate to: {output_dir}")
-print(f"  2. Start a local server:")
-print(f"     python -m http.server 8000")
-print(f"  3. Open: http://localhost:8000")
-print('=' * 50)
 ```
+user = bc.read_csv('user_id', 'path/')
+bc.visualization.export(user, 'output_dir/')
+```
+
+To view exported files:
+```
+cd output_dir/
+python -m http.server 8000
+```
+Then open `http://localhost:8000`
+
+## Dashboard Features
+
+| Panel | Shows |
+|-------|-------|
+| Summary | Basic stats, data quality, key metrics |
+| Timeline | Activity timeline with zoom/pan |
+| Network | Contact network graph |
+| Map | Antenna locations (if available) |
+| Charts | Call duration, daily/weekly patterns |
+
+## Data Requirements
+
+| Feature | Requires |
+|---------|----------|
+| Timeline | Records with datetime |
+| Network | correspondent_id in records |
+| Map | Antennas file with coordinates |
+| Spatial | antenna_id matching antennas file |
 
 ## Examples
 
-### Start Dashboard Server
-
+Start dashboard server:
 ```
 /bandicoot:visualize ego demo/data/ demo/data/antennas.csv
 ```
+Open `http://localhost:4242` in browser.
 
-Then open `http://localhost:4242` in your browser.
-
-### Custom Port
-
+Custom port:
 ```
 /bandicoot:visualize ego demo/data/ demo/data/antennas.csv --port=8080
 ```
 
-### Export Static Files
-
+Export static files:
 ```
 /bandicoot:visualize ego demo/data/ demo/data/antennas.csv --export
 ```
 
-### Export to Custom Directory
-
+Export to custom directory:
 ```
 /bandicoot:visualize ego demo/data/ --export --output=my_visualization
 ```
 
-## Dashboard Features
+## Export Directory Structure
 
-The Bandicoot visualization dashboard includes:
+```
+output_dir/
+  index.html          # Main page
+  js/                 # JavaScript files
+  css/                # Stylesheets
+  data/               # User data (JSON)
+```
 
-### 1. Summary Panel
-- Basic user statistics
-- Data quality indicators
-- Key metrics overview
+## Server Notes
 
-### 2. Timeline View
-- Interactive activity timeline
-- Calls and texts by day
-- Zoom and pan capabilities
-
-### 3. Contact Network
-- Visual network graph
-- Contact interaction frequency
-- Clustered by communication patterns
-
-### 4. Location Map
-- Antenna locations on map (if available)
-- Movement patterns
-- Home and frequent locations
-
-### 5. Statistical Charts
-- Call duration distribution
-- Daily/weekly patterns
-- Contact distribution
-
-## Important Notes
-
-### Server Mode
-
-1. The visualization runs a local HTTP server
-2. Only accessible from your local machine by default
-3. Press `Ctrl+C` in the terminal to stop the server
-4. The server blocks the terminal until stopped
+- Runs local HTTP server
+- Only accessible from local machine
+- Ctrl+C to stop server
+- Server blocks terminal until stopped
 
 ### Windows Considerations
 
 - Use `localhost` not `0.0.0.0` in browser
-- Firewall may prompt for network access (allow for local only)
-- Some browsers may block local servers - try different browser
-
-### Export Mode
-
-Advantages:
-- No running server required
-- Can be shared/hosted anywhere
-- Permanent copy of visualization
-
-To serve exported files:
-```bash
-cd {output_dir}
-python -m http.server 8000
-```
-
-Then open `http://localhost:8000`
-
-## Data Requirements
-
-For full visualization features:
-
-- **Timeline**: Requires records with datetime
-- **Network**: Requires correspondent_id in records
-- **Map**: Requires antennas file with coordinates
-- **Spatial**: Requires antenna_id in records matching antennas file
+- Firewall may prompt - allow for local only
+- Try different browser if blocked
 
 ## Troubleshooting
 
-### Server Won't Start
+**Server won't start**
+- Check port not in use: `netstat -an | grep PORT`
+- Try different port: `--port=8080`
+- Check firewall settings
 
-1. Check port is not in use: `netstat -an | grep {port}`
-2. Try different port: `--port=8080`
-3. Check firewall settings
+**Map not showing**
+- Verify antennas file provided
+- Check antenna coordinates valid
+- Ensure records have antenna_id values
 
-### Map Not Showing
+**Browser shows blank page**
+- Check browser console (F12)
+- Try different browser
+- Clear browser cache
+- Use export mode instead
 
-1. Verify antennas file is provided
-2. Check antenna coordinates are valid
-3. Ensure records have antenna_id values
-
-### Browser Shows Blank Page
-
-1. Check browser console for errors (F12)
-2. Try different browser
-3. Clear browser cache
-4. Use export mode instead
-
-### Can't Stop Server
-
-On Windows:
-- Close the terminal window
-- Or use Task Manager to end Python process
-
-On Unix:
-- Press Ctrl+C multiple times
-- Or `kill -9 $(lsof -t -i:{port})`
-
-## Export Directory Structure
-
-When using `--export`, creates:
-
-```
-{output_dir}/
-  index.html          # Main visualization page
-  js/                 # JavaScript files
-    bandicoot.js
-    d3.min.js
-    ...
-  css/                # Stylesheets
-    style.css
-  data/               # User data (JSON)
-    user.json
-```
-
-## Alternative: Quick Visualization
-
-For quick visual inspection without full dashboard:
-
-```python
-import bandicoot as bc
-import matplotlib.pyplot as plt
-
-user = bc.read_csv('ego', 'demo/data/', 'demo/data/antennas.csv')
-
-# Plot call duration distribution
-durations = [r.call_duration for r in user.records if r.call_duration]
-plt.hist(durations, bins=30)
-plt.xlabel('Call Duration (seconds)')
-plt.ylabel('Frequency')
-plt.title(f'Call Duration Distribution - {user.name}')
-plt.savefig('call_duration.png')
-```
-
-Note: Requires matplotlib (not included with Bandicoot).
+**Can't stop server**
+- Windows: Close terminal or Task Manager
+- Unix: Ctrl+C or `kill -9 $(lsof -t -i:PORT)`
