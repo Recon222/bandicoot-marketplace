@@ -413,6 +413,10 @@
       top: var(--space-6);
       right: var(--space-6);
       z-index: var(--z-controls);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: var(--space-3);
     }
 
     .controls-bottom {
@@ -723,6 +727,335 @@
       margin-top: var(--space-2);
       text-transform: uppercase;
       letter-spacing: 0.05em;
+    }
+
+    /* ============================================================
+       SECTION: Hamburger Menu Button
+       Iconic three-line menu trigger
+       Could be extracted to: css/components/hamburger-menu.css
+       ============================================================ */
+    .hamburger-menu {
+      position: relative;
+    }
+
+    .hamburger-menu__btn {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-primary);
+      transition: all var(--transition-fast);
+    }
+
+    .hamburger-menu__btn:hover {
+      color: var(--accent-primary);
+      transform: translateY(-2px);
+    }
+
+    .hamburger-menu__btn:active {
+      transform: translateY(0);
+    }
+
+    .hamburger-menu__icon {
+      width: 22px;
+      height: 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 4px 0;
+    }
+
+    .hamburger-menu__line {
+      width: 100%;
+      height: 2px;
+      background: currentColor;
+      border-radius: var(--radius-full);
+      transition: all var(--transition-base);
+      transform-origin: center;
+    }
+
+    /* Animate to X when open */
+    .hamburger-menu--open .hamburger-menu__line:nth-child(1) {
+      transform: translateY(6px) rotate(45deg);
+    }
+
+    .hamburger-menu--open .hamburger-menu__line:nth-child(2) {
+      opacity: 0;
+      transform: scaleX(0);
+    }
+
+    .hamburger-menu--open .hamburger-menu__line:nth-child(3) {
+      transform: translateY(-6px) rotate(-45deg);
+    }
+
+    /* ============================================================
+       SECTION: Quick Menu Dropdown
+       Small dropdown menu from hamburger
+       ============================================================ */
+    .quick-menu {
+      position: absolute;
+      top: calc(100% + var(--space-2));
+      right: 0;
+      min-width: 180px;
+      z-index: var(--z-dropdown);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-10px) scale(0.95);
+      transform-origin: top right;
+      transition: all var(--transition-base);
+    }
+
+    .hamburger-menu--open .quick-menu {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+    }
+
+    .quick-menu__list {
+      list-style: none;
+      padding: var(--space-2);
+    }
+
+    .quick-menu__item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .quick-menu__item:hover {
+      background: var(--bg-surface);
+      color: var(--accent-primary);
+    }
+
+    .quick-menu__item-icon {
+      width: 18px;
+      height: 18px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      transition: color var(--transition-fast);
+    }
+
+    .quick-menu__item:hover .quick-menu__item-icon {
+      color: var(--accent-primary);
+    }
+
+    .quick-menu__divider {
+      height: 1px;
+      background: var(--glass-border);
+      margin: var(--space-2) var(--space-3);
+    }
+
+    /* ============================================================
+       SECTION: Settings Modal
+       Centered modal with backdrop overlay
+       Could be extracted to: css/components/settings-modal.css
+       ============================================================ */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: var(--z-modal);
+      opacity: 0;
+      visibility: hidden;
+      transition: all var(--transition-base);
+    }
+
+    .modal-backdrop--visible {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .settings-modal {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      width: 90%;
+      max-width: 420px;
+      max-height: 80vh;
+      z-index: calc(var(--z-modal) + 1);
+      opacity: 0;
+      visibility: hidden;
+      transition: all var(--transition-base);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .settings-modal--visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    .settings-modal__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-5) var(--space-6);
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .settings-modal__title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .settings-modal__title-icon {
+      width: 22px;
+      height: 22px;
+      color: var(--accent-primary);
+    }
+
+    .settings-modal__close {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      transition: all var(--transition-fast);
+    }
+
+    .settings-modal__close:hover {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+    }
+
+    .settings-modal__close svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .settings-modal__body {
+      padding: var(--space-4) var(--space-6);
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .settings-modal__section {
+      margin-bottom: var(--space-6);
+    }
+
+    .settings-modal__section:last-child {
+      margin-bottom: 0;
+    }
+
+    .settings-modal__section-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: var(--space-4);
+    }
+
+    /* ============================================================
+       SECTION: Toggle Switch Component
+       iOS-style toggle switch
+       Could be extracted to: css/components/toggle-switch.css
+       ============================================================ */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .setting-row:last-child {
+      border-bottom: none;
+    }
+
+    .setting-row__info {
+      flex: 1;
+      min-width: 0;
+      padding-right: var(--space-4);
+    }
+
+    .setting-row__label {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+
+    .setting-row__description {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 52px;
+      height: 28px;
+      flex-shrink: 0;
+    }
+
+    .toggle-switch__input {
+      position: absolute;
+      opacity: 0;
+      width: 100%;
+      height: 100%;
+      cursor: pointer;
+      z-index: 1;
+    }
+
+    .toggle-switch__track {
+      position: absolute;
+      inset: 0;
+      background: var(--bg-surface);
+      border: 2px solid var(--glass-border);
+      border-radius: var(--radius-full);
+      transition: all var(--transition-fast);
+    }
+
+    .toggle-switch__input:checked + .toggle-switch__track {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+    }
+
+    .toggle-switch__thumb {
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 20px;
+      height: 20px;
+      background: var(--text-primary);
+      border-radius: 50%;
+      transition: all var(--transition-fast);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .toggle-switch__input:checked ~ .toggle-switch__thumb {
+      left: 28px;
+      background: var(--bg-primary);
+    }
+
+    .toggle-switch__input:focus-visible + .toggle-switch__track {
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    /* Disabled state */
+    .toggle-switch--disabled {
+      opacity: 0.5;
+      pointer-events: none;
     }
 
     /* ============================================================
@@ -2033,6 +2366,30 @@
         <span>events</span>
       </div>
     </div>
+
+    <!-- Hamburger Menu -->
+    <div class="hamburger-menu" id="hamburgerMenu">
+      <button class="hamburger-menu__btn glass-panel" id="hamburgerBtn" aria-label="Open menu" aria-expanded="false">
+        <div class="hamburger-menu__icon">
+          <span class="hamburger-menu__line"></span>
+          <span class="hamburger-menu__line"></span>
+          <span class="hamburger-menu__line"></span>
+        </div>
+      </button>
+
+      <!-- Quick Menu Dropdown -->
+      <div class="quick-menu glass-panel" id="quickMenu" role="menu">
+        <ul class="quick-menu__list">
+          <li class="quick-menu__item" id="menuSettings" role="menuitem" tabindex="0">
+            <svg class="quick-menu__item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            <span>Settings</span>
+          </li>
+        </ul>
+      </div>
+    </div>
   </div>
 
   <!-- ============================================================
@@ -2145,6 +2502,51 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Settings Modal
+       Centered modal for application settings
+       ============================================================ -->
+  <div class="modal-backdrop" id="modalBackdrop"></div>
+
+  <div class="settings-modal glass-panel" id="settingsModal" role="dialog" aria-labelledby="settingsTitle" aria-modal="true">
+    <div class="settings-modal__header">
+      <h2 class="settings-modal__title" id="settingsTitle">
+        <svg class="settings-modal__title-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        Settings
+      </h2>
+      <button class="settings-modal__close" id="settingsClose" aria-label="Close settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/>
+          <line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="settings-modal__body">
+      <!-- Map Settings Section -->
+      <div class="settings-modal__section">
+        <div class="settings-modal__section-title">Map Display</div>
+
+        <!-- Clustering Toggle -->
+        <div class="setting-row">
+          <div class="setting-row__info">
+            <div class="setting-row__label">Point Clustering</div>
+            <div class="setting-row__description">Group nearby events into clusters. Disable to show all individual points.</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" class="toggle-switch__input" id="settingClustering" checked>
+            <span class="toggle-switch__track"></span>
+            <span class="toggle-switch__thumb"></span>
+          </label>
+        </div>
+
       </div>
     </div>
   </div>
