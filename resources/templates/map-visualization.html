@@ -2570,23 +2570,120 @@
               <circle cx="12" cy="10" r="3"/>
             </svg>
             <h2 style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-2);">
-              Map Visualization Demo
+              Map Visualization
             </h2>
             <p style="font-size: 14px; max-width: 400px; line-height: 1.6; margin-bottom: var(--space-4);">
-              To display the interactive map, provide a valid Mapbox access token when generating this visualization.
+              Enter your Mapbox access token to display the interactive map.
             </p>
-            <code style="
-              font-family: var(--font-mono);
-              font-size: 12px;
-              background: var(--bg-surface);
-              padding: var(--space-2) var(--space-4);
-              border-radius: var(--radius-md);
-              color: var(--accent-primary);
+            <div style="
+              display: flex;
+              flex-direction: column;
+              gap: var(--space-3);
+              width: 100%;
+              max-width: 400px;
             ">
-              mapbox_token='pk.your_token_here'
-            </code>
+              <input
+                type="text"
+                id="mapboxTokenInput"
+                placeholder="pk.eyJ1Ijoi..."
+                autocomplete="off"
+                spellcheck="false"
+                style="
+                  width: 100%;
+                  padding: var(--space-3) var(--space-4);
+                  font-family: var(--font-mono);
+                  font-size: 14px;
+                  background: var(--bg-surface);
+                  border: 1px solid var(--glass-border);
+                  border-radius: var(--radius-md);
+                  color: var(--text-primary);
+                  outline: none;
+                  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+                "
+                onfocus="this.style.borderColor='var(--accent-primary)'; this.style.boxShadow='0 0 0 2px var(--accent-glow)';"
+                onblur="this.style.borderColor='var(--glass-border)'; this.style.boxShadow='none';"
+              >
+              <button
+                id="mapboxTokenSubmit"
+                style="
+                  padding: var(--space-3) var(--space-6);
+                  font-size: 14px;
+                  font-weight: 500;
+                  background: var(--accent-primary);
+                  color: white;
+                  border: none;
+                  border-radius: var(--radius-md);
+                  cursor: pointer;
+                  transition: background var(--transition-fast), transform var(--transition-fast);
+                "
+                onmouseover="this.style.background='var(--accent-secondary)';"
+                onmouseout="this.style.background='var(--accent-primary)';"
+                onmousedown="this.style.transform='scale(0.98)';"
+                onmouseup="this.style.transform='scale(1)';"
+              >
+                Load Map
+              </button>
+              <p id="mapboxTokenError" style="
+                font-size: 12px;
+                color: var(--color-call-out);
+                display: none;
+              "></p>
+            </div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: var(--space-4); max-width: 400px;">
+              Get a free token at <a href="https://mapbox.com" target="_blank" rel="noopener" style="color: var(--accent-primary);">mapbox.com</a>
+            </p>
           </div>
         `;
+
+        // Set up token input event handlers
+        const tokenInput = document.getElementById('mapboxTokenInput');
+        const tokenSubmit = document.getElementById('mapboxTokenSubmit');
+        const tokenError = document.getElementById('mapboxTokenError');
+
+        const handleTokenSubmit = () => {
+          const token = tokenInput.value.trim();
+
+          // Validate token format
+          if (!token) {
+            tokenError.textContent = 'Please enter a Mapbox access token.';
+            tokenError.style.display = 'block';
+            return;
+          }
+
+          if (!token.startsWith('pk.')) {
+            tokenError.textContent = 'Token must start with "pk." (public token).';
+            tokenError.style.display = 'block';
+            return;
+          }
+
+          // Hide error and show loading state
+          tokenError.style.display = 'none';
+          tokenSubmit.textContent = 'Loading...';
+          tokenSubmit.disabled = true;
+
+          // Update config and reinitialize map
+          CONFIG.MAPBOX_TOKEN = token;
+
+          // Clear the container and reinitialize
+          mapContainer.innerHTML = '';
+          this.init().catch(error => {
+            console.error('[MapController] Failed to initialize with token:', error);
+            tokenError.textContent = 'Failed to load map. Please check your token.';
+            tokenError.style.display = 'block';
+            tokenSubmit.textContent = 'Load Map';
+            tokenSubmit.disabled = false;
+            this._showDemoMode();
+          });
+        };
+
+        tokenSubmit.addEventListener('click', handleTokenSubmit);
+        tokenInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            handleTokenSubmit();
+          }
+        });
+
         EventBus.emit('map:demo-mode');
       },
 
