@@ -969,6 +969,207 @@
     }
 
     /* ============================================================
+       SECTION: Contact Filter Component
+       Multi-select contact list with search and presets
+       Could be extracted to: css/components/contact-filter.css
+       ============================================================ */
+    .contact-filter {
+      width: 280px;
+    }
+
+    .contact-filter__header {
+      padding: var(--space-4);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .contact-filter__title {
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+    }
+
+    .contact-filter__count {
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--accent-primary);
+      background: rgba(0, 212, 255, 0.1);
+      padding: 2px 8px;
+      border-radius: var(--radius-full);
+    }
+
+    .contact-filter__search {
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .contact-filter__search-input {
+      width: 100%;
+      background: var(--bg-surface);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      padding: var(--space-2) var(--space-3);
+      font-size: 13px;
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color var(--transition-fast);
+    }
+
+    .contact-filter__search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .contact-filter__search-input:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 2px var(--accent-glow);
+    }
+
+    .contact-filter__presets {
+      padding: var(--space-3) var(--space-4);
+      display: flex;
+      gap: var(--space-2);
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .contact-filter__preset {
+      flex: 1;
+      padding: var(--space-2) var(--space-3);
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .contact-filter__preset:hover {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      border-color: var(--text-muted);
+    }
+
+    .contact-filter__preset--active {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+      color: var(--bg-primary);
+    }
+
+    .contact-filter__preset--active:hover {
+      background: var(--accent-primary-hover);
+      border-color: var(--accent-primary-hover);
+      color: var(--bg-primary);
+    }
+
+    .contact-filter__list {
+      max-height: 240px;
+      overflow-y: auto;
+      padding: var(--space-2);
+    }
+
+    .contact-filter__item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--transition-fast);
+    }
+
+    .contact-filter__item:hover {
+      background: var(--bg-surface);
+    }
+
+    .contact-filter__checkbox {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--text-muted);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all var(--transition-fast);
+      flex-shrink: 0;
+    }
+
+    .contact-filter__item--selected .contact-filter__checkbox {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+    }
+
+    .contact-filter__checkbox-icon {
+      width: 10px;
+      height: 10px;
+      stroke: var(--bg-primary);
+      stroke-width: 3;
+      opacity: 0;
+      transform: scale(0.5);
+      transition: all var(--transition-fast);
+    }
+
+    .contact-filter__item--selected .contact-filter__checkbox-icon {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .contact-filter__contact-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .contact-filter__contact-id {
+      font-size: 13px;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .contact-filter__contact-stats {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      gap: var(--space-2);
+      margin-top: 2px;
+    }
+
+    .contact-filter__stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .contact-filter__stat-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .contact-filter__stat-dot--calls {
+      background: var(--color-call-in);
+    }
+
+    .contact-filter__stat-dot--texts {
+      background: var(--color-text-in);
+    }
+
+    .contact-filter__empty {
+      padding: var(--space-6) var(--space-4);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    /* ============================================================
        SECTION: Responsive Breakpoints
        Mobile-first responsive adjustments
        Could be extracted to: css/responsive.css
@@ -1052,9 +1253,31 @@
       </svg>
     </button>
 
-    <!-- Contact Filter Panel (placeholder - will be populated in Phase 5) -->
+    <!-- Contact Filter Panel - Multi-select contact list -->
     <div class="contact-filter glass-panel" id="contactFilter">
-      <!-- Content added in Phase 5 -->
+      <div class="contact-filter__header">
+        <span class="contact-filter__title">Contacts</span>
+        <span class="contact-filter__count" id="contactCount">0/0</span>
+      </div>
+      <div class="contact-filter__search">
+        <input
+          type="text"
+          class="contact-filter__search-input"
+          placeholder="Search contacts..."
+          id="contactSearch"
+        >
+      </div>
+      <div class="contact-filter__presets">
+        <button class="contact-filter__preset contact-filter__preset--active" data-preset="all">All</button>
+        <button class="contact-filter__preset" data-preset="top10">Top 10</button>
+        <button class="contact-filter__preset" data-preset="none">None</button>
+      </div>
+      <div class="contact-filter__list" id="contactList">
+        <!-- Contact items populated by JavaScript -->
+        <div class="contact-filter__empty" id="contactListEmpty">
+          No contacts loaded
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2503,6 +2726,255 @@
     };
 
     // ============================================================
+    // MODULE: ContactFilter
+    // Multi-select dropdown for filtering events by contact
+    // Could be extracted to: js/components/ContactFilter.js
+    // ============================================================
+    const ContactFilter = {
+      /** @type {Array<{id: string, calls: number, texts: number, total: number}>} */
+      contacts: [],
+
+      /**
+       * Initialize the contact filter component
+       */
+      init() {
+        console.log('[ContactFilter] Initializing...');
+
+        // Listen for data loaded event
+        EventBus.on('data:loaded', ({ contacts }) => {
+          console.log('[ContactFilter] Data loaded, rendering contacts:', contacts.length);
+          this.contacts = contacts;
+          this.render();
+          this.updateCount();
+        });
+
+        // Search input with debounce
+        const searchInput = document.getElementById('contactSearch');
+        if (searchInput) {
+          let debounceTimer;
+          searchInput.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+              this.filterList(e.target.value);
+            }, 150);
+          });
+        }
+
+        // Preset buttons (All, Top 10, None)
+        document.querySelectorAll('.contact-filter__preset').forEach(btn => {
+          btn.addEventListener('click', () => {
+            this.handlePreset(btn.dataset.preset);
+          });
+        });
+
+        console.log('[ContactFilter] Initialized');
+      },
+
+      /**
+       * Render the contact list with stats
+       */
+      render() {
+        const list = document.getElementById('contactList');
+        const emptyEl = document.getElementById('contactListEmpty');
+
+        if (!list) {
+          console.warn('[ContactFilter] Contact list element not found');
+          return;
+        }
+
+        // Clear existing items (but keep the empty state element)
+        Array.from(list.children).forEach(child => {
+          if (child.id !== 'contactListEmpty') {
+            child.remove();
+          }
+        });
+
+        // Hide empty state if we have contacts
+        if (emptyEl) {
+          emptyEl.style.display = this.contacts.length === 0 ? 'block' : 'none';
+        }
+
+        // Render each contact
+        this.contacts.forEach((contact, index) => {
+          const item = document.createElement('div');
+          item.className = 'contact-filter__item contact-filter__item--selected';
+          item.dataset.id = contact.id;
+          item.style.animationDelay = `${index * 30}ms`;
+
+          item.innerHTML = `
+            <div class="contact-filter__checkbox">
+              <svg class="contact-filter__checkbox-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <div class="contact-filter__contact-info">
+              <div class="contact-filter__contact-id">${this.escapeHtml(contact.id)}</div>
+              <div class="contact-filter__contact-stats">
+                <span class="contact-filter__stat">
+                  <span class="contact-filter__stat-dot contact-filter__stat-dot--calls"></span>
+                  ${contact.calls}
+                </span>
+                <span class="contact-filter__stat">
+                  <span class="contact-filter__stat-dot contact-filter__stat-dot--texts"></span>
+                  ${contact.texts}
+                </span>
+              </div>
+            </div>
+          `;
+
+          // Click handler for toggling selection
+          item.addEventListener('click', () => this.toggleContact(contact.id, item));
+          list.appendChild(item);
+        });
+
+        console.log('[ContactFilter] Rendered', this.contacts.length, 'contacts');
+      },
+
+      /**
+       * Escape HTML special characters for safe rendering
+       * @param {string} str - Input string
+       * @returns {string} Escaped string
+       */
+      escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      },
+
+      /**
+       * Toggle contact selection
+       * @param {string} id - Contact ID
+       * @param {HTMLElement} item - Contact item element
+       */
+      toggleContact(id, item) {
+        item.classList.toggle('contact-filter__item--selected');
+        const selected = State.get('contacts.selected') || [];
+
+        if (item.classList.contains('contact-filter__item--selected')) {
+          // Add to selection
+          if (!selected.includes(id)) {
+            State.set('contacts.selected', [...selected, id]);
+          }
+        } else {
+          // Remove from selection
+          State.set('contacts.selected', selected.filter(c => c !== id));
+        }
+
+        // Update mode to custom selection
+        State.set('contacts.mode', 'selected');
+        this.updatePresetButtons('');
+        this.updateCount();
+
+        // Emit filter update event
+        EventBus.emit('filter:update');
+      },
+
+      /**
+       * Handle preset button clicks (All, Top 10, None)
+       * @param {string} preset - Preset name
+       */
+      handlePreset(preset) {
+        console.log('[ContactFilter] Applying preset:', preset);
+        this.updatePresetButtons(preset);
+        const items = document.querySelectorAll('.contact-filter__item');
+
+        switch (preset) {
+          case 'all':
+            items.forEach(item => item.classList.add('contact-filter__item--selected'));
+            State.set('contacts.mode', 'all');
+            State.set('contacts.selected', this.contacts.map(c => c.id));
+            break;
+
+          case 'none':
+            items.forEach(item => item.classList.remove('contact-filter__item--selected'));
+            State.set('contacts.mode', 'selected');
+            State.set('contacts.selected', []);
+            break;
+
+          case 'top10':
+            const top10 = this.contacts.slice(0, 10).map(c => c.id);
+            items.forEach(item => {
+              if (top10.includes(item.dataset.id)) {
+                item.classList.add('contact-filter__item--selected');
+              } else {
+                item.classList.remove('contact-filter__item--selected');
+              }
+            });
+            State.set('contacts.mode', 'selected');
+            State.set('contacts.selected', top10);
+            break;
+        }
+
+        this.updateCount();
+        EventBus.emit('filter:update');
+      },
+
+      /**
+       * Update preset button active states
+       * @param {string} active - Active preset name (or empty string for none)
+       */
+      updatePresetButtons(active) {
+        document.querySelectorAll('.contact-filter__preset').forEach(btn => {
+          const isActive = btn.dataset.preset === active;
+          btn.classList.toggle('contact-filter__preset--active', isActive);
+        });
+      },
+
+      /**
+       * Filter the contact list by search query
+       * @param {string} query - Search query
+       */
+      filterList(query) {
+        const items = document.querySelectorAll('.contact-filter__item');
+        const lowerQuery = query.toLowerCase().trim();
+
+        let visibleCount = 0;
+        items.forEach(item => {
+          const id = (item.dataset.id || '').toLowerCase();
+          const matches = lowerQuery === '' || id.includes(lowerQuery);
+          item.style.display = matches ? 'flex' : 'none';
+          if (matches) visibleCount++;
+        });
+
+        // Update empty state
+        const emptyEl = document.getElementById('contactListEmpty');
+        if (emptyEl) {
+          if (visibleCount === 0 && this.contacts.length > 0) {
+            emptyEl.style.display = 'block';
+            emptyEl.textContent = 'No matching contacts';
+          } else if (this.contacts.length === 0) {
+            emptyEl.style.display = 'block';
+            emptyEl.textContent = 'No contacts loaded';
+          } else {
+            emptyEl.style.display = 'none';
+          }
+        }
+      },
+
+      /**
+       * Update the selected/total count display
+       */
+      updateCount() {
+        const selected = document.querySelectorAll('.contact-filter__item--selected').length;
+        const total = this.contacts.length;
+        const countEl = document.getElementById('contactCount');
+
+        if (countEl) {
+          countEl.textContent = `${selected}/${total}`;
+
+          // Add visual feedback for selection state
+          if (selected === 0) {
+            countEl.style.color = 'var(--accent-secondary)';
+          } else if (selected === total) {
+            countEl.style.color = 'var(--accent-primary)';
+          } else {
+            countEl.style.color = 'var(--text-secondary)';
+          }
+        }
+      }
+    };
+
+    // ============================================================
     // MODULE: Application Bootstrap
     // Initializes all modules and starts the application
     // Could be extracted to: js/main.js
@@ -2525,7 +2997,12 @@
         TimeController.init();
         TimeSlider.init();
 
-        // Phase 3: Initialize map
+        // Phase 3: Initialize filters
+        if (loadingText) loadingText.textContent = 'Loading Filters';
+        if (loadingSubtext) loadingSubtext.textContent = 'Initializing contact filter...';
+        ContactFilter.init();
+
+        // Phase 4: Initialize map
         if (loadingText) loadingText.textContent = 'Loading Map';
         if (loadingSubtext) loadingSubtext.textContent = 'Initializing Mapbox GL JS...';
         await MapController.init();
