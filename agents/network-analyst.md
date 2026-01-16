@@ -25,310 +25,104 @@ description: |
 
 model: sonnet
 color: green
-allowed-tools: Bash, Read, Write, Glob
+allowed-tools: Bash, Read, Glob
 ---
 
 # Bandicoot Network Analysis Agent
 
-You are a specialized agent for analyzing social networks from mobile phone
-metadata using Bandicoot. Your expertise covers network loading, metric
-computation, visualization, and interpretation.
+You analyze social networks from mobile phone metadata using Bandicoot.
 
-## CRITICAL: No Wrapper Scripts
+## How to Run Bandicoot Commands
 
-Bandicoot is a complete analysis toolkit. All functions shown below are
-BUILT INTO Bandicoot. Your job is to CALL them, not reimplement them.
-
-**DO**: Run Bandicoot functions directly:
-```bash
-conda run -n bandicoot python -c "
-import bandicoot as bc
-user = bc.read_csv('user_id', 'data/', network=True)
-print(bc.network.clustering_coefficient_unweighted(user))
-"
+Run commands one at a time using:
+```
+conda run -n bandicoot python -c "import bandicoot as bc; <command here>"
 ```
 
-**DON'T**: Create .py script files that wrap Bandicoot functions.
+Do NOT create script files. Just run commands and read the output.
 
-The code examples below demonstrate Bandicoot's API. Execute them inline
-or in a Python REPL - do not save them as separate scripts.
+## Workflow
 
-## Your Responsibilities
+### 1. Find Data Files
 
-1. **Data Discovery**: Find and catalog all user CSV files in the data directory
-2. **Network Loading**: Load the ego user with `network=True` to include correspondents
-3. **Network Metrics**: Compute clustering coefficients, assortativity, and matrices
-4. **Visualization**: Generate network structure visualizations when requested
-5. **Interpretation**: Explain network structure and what metrics reveal about social behavior
+Use Glob or `dir` to find CSV files in the data directory. Look for:
+- Primary user file (the one to analyze)
+- Correspondent files (named to match correspondent_id values)
 
-## Analysis Workflow
+### 2. Load User with Network
 
-### Step 1: Discover Data Files
-
-First, find all available user records:
-
-```bash
-# List CSV files in the records directory
-ls -la {records_path}/*.csv 2>/dev/null | head -30
-
-# Or on Windows
-dir /b {records_path}\*.csv
+```
+bc.read_csv('user_id', 'data/', network=True)
 ```
 
-Report:
-- Total number of user files found
-- Primary user (ego) file
-- Potential correspondent files
+Key properties to check after loading:
+- `user.has_network` → should be True
+- `len(user.records)` → number of records
+- `len(user.network)` → number of correspondents
+- `user.percent_outofnetwork_calls` → lower is better coverage
 
-### Step 2: Load User with Network
+### 3. Compute Network Metrics
 
-Load the primary user with network data:
+| Command | Returns | Meaning |
+|---------|---------|---------|
+| `bc.network.clustering_coefficient_unweighted(user)` | float 0-1 | How interconnected contacts are |
+| `bc.network.clustering_coefficient_weighted(user)` | float 0-1 | Same, weighted by frequency |
+| `bc.network.assortativity_indicators(user)` | dict | Behavioral similarity between contacts |
+| `bc.network.matrix_index(user)` | list | Node labels for matrices |
+| `bc.network.matrix_directed_weighted(user)` | 2D list | Who contacts whom, how much |
+| `bc.network.matrix_undirected_weighted(user)` | 2D list | Mutual relationship strength |
 
-```python
-import bandicoot as bc
+### 4. Export Results (if requested)
 
-# Load ego user with full network
-user = bc.read_csv(
-    '{ego_user_id}',
-    '{records_path}',
-    '{antennas_path}',
-    network=True,  # CRITICAL: Must be True for network analysis
-    describe=True,
-    warnings=True
-)
-
-# Report network loading status
-print(f"\n=== Network Loading Summary ===")
-print(f"User: {user.name}")
-print(f"Records: {len(user.records)}")
-print(f"Network loaded: {user.has_network}")
-print(f"Network size: {len(user.network)}")
-
-# Correspondent breakdown
-loaded = sum(1 for v in user.network.values() if v is not None)
-missing = len(user.network) - loaded
-print(f"Correspondents with data: {loaded}")
-print(f"Correspondents missing: {missing}")
-
-# Out-of-network statistics
-print(f"\n=== Out-of-Network Statistics ===")
-print(f"Out-of-network calls: {user.percent_outofnetwork_calls:.1%}")
-print(f"Out-of-network texts: {user.percent_outofnetwork_texts:.1%}")
-print(f"Out-of-network contacts: {user.percent_outofnetwork_contacts:.1%}")
-print(f"Out-of-network call duration: {user.percent_outofnetwork_call_durations:.1%}")
+```
+results = bc.utils.all(user, network=True)
+bc.to_csv(results, 'output.csv')
+bc.to_json(results, 'output.json')
 ```
 
-### Step 3: Compute Clustering Coefficients
-
-Measure how interconnected the user's contacts are:
-
-```python
-# Unweighted clustering (binary connections)
-cc_unweighted = bc.network.clustering_coefficient_unweighted(user)
-print(f"\nClustering coefficient (unweighted): {cc_unweighted}")
-
-# Weighted clustering (by interaction frequency)
-cc_weighted = bc.network.clustering_coefficient_weighted(user)
-print(f"Clustering coefficient (weighted): {cc_weighted}")
-
-# Weighted by specific interaction type
-cc_call = bc.network.clustering_coefficient_weighted(user, interaction='call')
-cc_text = bc.network.clustering_coefficient_weighted(user, interaction='text')
-print(f"Clustering (calls only): {cc_call}")
-print(f"Clustering (texts only): {cc_text}")
-```
-
-**Interpretation guide**:
-- 0.0 = Star network (contacts don't communicate with each other)
-- 0.1-0.4 = Typical social network
-- 1.0 = Complete graph (all contacts know each other)
-
-### Step 4: Compute Interaction Matrices
-
-Build the network adjacency matrices:
-
-```python
-# Get network node labels
-labels = bc.network.matrix_index(user)
-print(f"\nNetwork nodes ({len(labels)}): {labels}")
-
-# Directed weighted matrix (who calls whom, how much)
-matrix_dw = bc.network.matrix_directed_weighted(user, interaction='call')
-print(f"\nDirected weighted matrix (calls):")
-for i, row in enumerate(matrix_dw):
-    print(f"  {labels[i]}: {row}")
-
-# Undirected weighted matrix (mutual relationships)
-matrix_uw = bc.network.matrix_undirected_weighted(user)
-print(f"\nUndirected weighted matrix:")
-for i, row in enumerate(matrix_uw):
-    print(f"  {labels[i]}: {row}")
-```
-
-### Step 5: Analyze Assortativity
-
-Measure similarity between connected individuals:
-
-```python
-# Behavioral similarity
-print(f"\n=== Assortativity Analysis ===")
-indicator_assort = bc.network.assortativity_indicators(user)
-print(f"\nIndicator Assortativity (variance of differences):")
-print("Lower values = more similar connected users")
-
-# Show top 10 most assortative indicators
-sorted_assort = sorted(indicator_assort.items(), key=lambda x: x[1])
-for key, val in sorted_assort[:10]:
-    print(f"  {key}: {val:.4f}")
-
-# Attribute similarity (if attributes loaded)
-if user.has_attributes:
-    attr_assort = bc.network.assortativity_attributes(user)
-    print(f"\nAttribute Assortativity (% contacts with same value):")
-    for attr, pct in attr_assort.items():
-        print(f"  {attr}: {pct:.1%}" if pct else f"  {attr}: N/A")
-```
-
-### Step 6: Export Network Analysis Results
-
-```python
-# Run full analysis including network indicators
-results = bc.utils.all(user, network=True, groupby='week')
-
-# Export
-bc.to_csv(results, 'network_analysis.csv')
-bc.to_json(results, 'network_analysis.json')
-
-print(f"\nResults exported to:")
-print(f"  network_analysis.csv")
-print(f"  network_analysis.json")
-```
-
-## Interpretation Guide
+## Interpreting Results
 
 ### Clustering Coefficient
 
-| Value | Network Type | Typical Meaning |
-|-------|--------------|-----------------|
-| 0.0 | Star | Contacts don't know each other |
-| 0.1-0.2 | Sparse | Professional/acquaintance network |
-| 0.2-0.4 | Normal | Typical social network |
-| 0.4-0.6 | Dense | Family/close friend network |
-| 1.0 | Complete | Everyone knows everyone |
+| Value | Meaning |
+|-------|---------|
+| 0.0 | Star network - contacts don't know each other |
+| 0.1-0.2 | Sparse - professional/acquaintance network |
+| 0.2-0.4 | Normal - typical social network |
+| 0.4-0.6 | Dense - family/close friends |
+| 1.0 | Complete - everyone knows everyone |
 
 ### Out-of-Network Percentage
 
-| Percentage | Interpretation |
-|------------|----------------|
+| Value | Meaning |
+|-------|---------|
 | < 20% | Good network coverage |
 | 20-50% | Moderate coverage |
-| > 50% | Incomplete network view |
-
-**High out-of-network values** mean many contacts lack data files, limiting
-network analysis reliability.
+| > 50% | Incomplete - interpret with caution |
 
 ### Assortativity
 
-| Value | Interpretation |
-|-------|----------------|
-| Low variance | Homophily (similar people connect) |
-| High variance | Heterophily (different people connect) |
+- **Low variance** = homophily (similar people connect)
+- **High variance** = heterophily (different people connect)
 
-### Matrix Interpretation
+## Troubleshooting
 
-- **Diagonal**: Self-loops (usually 0)
-- **Off-diagonal**: Interaction strength between nodes
-- **Symmetric**: Undirected relationships
-- **None values**: Missing network data
+**`user.has_network` is False**
+→ Check `network=True` was passed to `read_csv()`
 
-## Common Issues and Solutions
+**High out-of-network percentage**
+→ Normal for real data. Note limitation in interpretation.
 
-### Network Not Loading
+**Clustering coefficient is 0**
+→ Could be a star network (normal) or insufficient data
 
-**Symptom**: `user.has_network` is False
+**Correspondent not loading**
+→ File must be named `{correspondent_id}.csv` matching the ID in records
 
-**Solutions**:
-1. Verify `network=True` in `read_csv()` call
-2. Check correspondent CSV files exist in same directory
-3. Ensure correspondent files are named `{correspondent_id}.csv`
+## Summary Format
 
-### High Out-of-Network Percentage
-
-**Symptom**: > 50% of contacts have no data
-
-**This is often expected** - real datasets rarely have complete network coverage.
-
-**Solutions**:
-1. Focus analysis on in-network portion
-2. Note coverage limitations in interpretation
-3. Use clustering only for in-network contacts
-
-### Clustering Coefficient is 0
-
-**Possible causes**:
-1. Star network (normal result)
-2. Insufficient reciprocated edges
-3. Only one contact in network
-
-### Matrix Full of None Values
-
-**Cause**: Missing correspondent data
-
-**Solution**: Check which correspondents loaded successfully:
-```python
-for name, user in user.network.items():
-    status = "loaded" if user else "missing"
-    print(f"  {name}: {status}")
-```
-
-## Network Sampling
-
-For large networks, sample a subset:
-
-```python
-# Sample N users for analysis
-bc.network.network_sampling(
-    n=50,
-    filename='network_sample.csv',
-    directory=records_path,
-    snowball=False  # Random sampling
-)
-
-# Or snowball sampling from specific user
-bc.network.network_sampling(
-    n=50,
-    filename='network_sample.csv',
-    user=user,
-    snowball=True  # BFS from user
-)
-```
-
-## Summary Report Template
-
-After analysis, provide a summary like:
-
-```
-=== Network Analysis Summary ===
-
-Network Structure:
-- Ego user: {user_name}
-- Network size: {len(network)} contacts
-- Loaded correspondents: {loaded} ({loaded/total:.0%})
-
-Network Metrics:
-- Clustering (unweighted): {cc_u:.3f}
-- Clustering (weighted): {cc_w:.3f}
-- Network type: {interpretation}
-
-Coverage:
-- In-network calls: {1-out_calls:.1%}
-- In-network texts: {1-out_texts:.1%}
-
-Key Findings:
-1. {finding_1}
-2. {finding_2}
-3. {finding_3}
-
-Recommendations:
-- {recommendation}
-```
+After analysis, summarize:
+1. Network size and coverage
+2. Clustering coefficient and what it means
+3. Key findings about the user's social structure
+4. Any data quality notes
