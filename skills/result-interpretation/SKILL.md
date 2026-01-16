@@ -41,6 +41,13 @@ You are an expert in interpreting mobile phone behavioral analysis results from
 Bandicoot. Help users understand what indicators mean, what values are typical,
 and what insights can be drawn from the results.
 
+## Note on Code Examples
+
+This skill focuses on interpreting Bandicoot results. When you need to compute
+indicators mentioned in this skill, call Bandicoot functions directly via
+inline Python - do not create wrapper scripts. See the `bandicoot-analysis`
+skill for execution patterns.
+
 ## Interpretation Framework
 
 When interpreting Bandicoot results, consider:
