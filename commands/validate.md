@@ -7,6 +7,13 @@ argument-hint: [--env-only] [--user USER_ID --data PATH] [--antennas PATH] [--li
 
 Validate your Bandicoot environment and CDR data files using the included validation script.
 
+**Note**: This command uses a bundled validation script (`scripts/validate.py`)
+from the plugin. This is an EXCEPTION to the "no wrapper scripts" guidance -
+this script is part of the plugin distribution, not a wrapper around Bandicoot
+functions. You are running it, not creating it.
+
+For actual Bandicoot analysis after validation passes, use inline Python calls.
+
 ## Usage
 
 Run the validation script from the plugin's scripts directory:
