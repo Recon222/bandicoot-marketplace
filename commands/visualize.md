@@ -19,6 +19,9 @@ Start the interactive D3.js visualization dashboard or export static visualizati
 
 ## Execution
 
+Execute the following Python code inline using `conda run -n bandicoot python -c "..."`.
+Do not save this as a separate script file.
+
 ### Option 1: Run Interactive Dashboard
 
 ```python
