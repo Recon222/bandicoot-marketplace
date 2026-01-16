@@ -55,7 +55,8 @@ If antennas_path is provided, verify it exists too.
 
 ### Step 3: Load User Data
 
-Execute the following Python code, adjusting based on provided arguments:
+Execute the following Python code inline using `conda run -n bandicoot python -c "..."`.
+Do not save this as a separate script file.
 
 **With antennas file:**
 
