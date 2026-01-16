@@ -1575,19 +1575,19 @@
     /* ============================================================
        SECTION: Popup Animations
        Smooth entrance animations for map popups
+       NOTE: Cannot use transform animations as they conflict with
+       Mapbox's internal positioning transforms (which use translate)
        ============================================================ */
     .mapboxgl-popup {
-      animation: popupEnter 0.25s var(--ease-out-expo) forwards;
+      animation: popupFadeIn 0.2s ease-out forwards;
     }
 
-    @keyframes popupEnter {
+    @keyframes popupFadeIn {
       from {
         opacity: 0;
-        transform: translateY(8px) scale(0.95);
       }
       to {
         opacity: 1;
-        transform: translateY(0) scale(1);
       }
     }
 
@@ -3210,16 +3210,60 @@
           this.popup.remove();
         }
 
-        // Create and show new popup
+        // Determine best anchor position based on marker location on screen
+        const point = this.map.project(feature.geometry.coordinates);
+        const anchor = this._determinePopupAnchor(point);
+
+        // Create and show new popup with offset and smart anchor
         this.popup = new mapboxgl.Popup({
           closeButton: false,
           closeOnClick: true,
           maxWidth: CONFIG.POPUP_MAX_WIDTH,
-          className: 'bandicoot-popup'
+          className: 'bandicoot-popup',
+          offset: 15,
+          anchor: anchor
         })
           .setLngLat(feature.geometry.coordinates)
           .setHTML(html)
           .addTo(this.map);
+      },
+
+      /**
+       * Determine optimal popup anchor based on marker screen position
+       * Avoids control panels and viewport edges
+       * @param {Object} point - Screen coordinates {x, y}
+       * @returns {string} Anchor position for Mapbox popup
+       */
+      _determinePopupAnchor(point) {
+        const mapContainer = this.map.getContainer();
+        const width = mapContainer.offsetWidth;
+        const height = mapContainer.offsetHeight;
+
+        // Control panel dimensions (approximate)
+        const leftPanelWidth = 300;   // Contact filter panel
+        const topPanelHeight = 150;   // Clock display
+        const bottomPanelHeight = 200; // Timeline controls
+
+        // Check if marker is near control panels or edges
+        const nearLeft = point.x < leftPanelWidth + 50;
+        const nearTop = point.y < topPanelHeight + 50;
+        const nearBottom = point.y > height - bottomPanelHeight - 50;
+        const nearRight = point.x > width - 50;
+
+        // Determine best anchor to keep popup visible and away from controls
+        if (nearLeft && nearTop) return 'top-left';
+        if (nearLeft && nearBottom) return 'bottom-left';
+        if (nearLeft) return 'left';
+
+        if (nearRight && nearTop) return 'top-right';
+        if (nearRight && nearBottom) return 'bottom-right';
+        if (nearRight) return 'right';
+
+        if (nearTop) return 'top';
+        if (nearBottom) return 'bottom';
+
+        // Default to bottom (popup appears above marker)
+        return 'bottom';
       },
 
       /**
