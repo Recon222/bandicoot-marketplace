@@ -17,124 +17,73 @@ Load user phone records from CSV files into Bandicoot and display a summary.
 
 ## Expected File Structure
 
-The records file must be located at: `{records_path}/{user_id}.csv`
+Records file: `{records_path}/{user_id}.csv`
 
-For example, if user_id is "ego" and records_path is "demo/data/":
+Example: if user_id is "ego" and records_path is "demo/data/":
 - Records file: `demo/data/ego.csv`
 - Antennas file (if provided): `demo/data/antennas.csv`
 
-## Execution Steps
+## How to Run
 
-### Step 1: Verify Environment
-
-First, check that Bandicoot is available:
-
-```bash
-conda run -n bandicoot python -c "import bandicoot as bc; print(f'Bandicoot {bc.__version__} ready')"
+Execute commands using:
+```
+conda run -n bandicoot python -c "import bandicoot as bc; <commands>"
 ```
 
-If conda is not available, try direct Python:
+Do NOT create script files. Run commands inline and read the output.
 
-```bash
-python -c "import bandicoot as bc; print(f'Bandicoot {bc.__version__} ready')"
+## Load Commands
+
+| Command | Purpose |
+|---------|---------|
+| `bc.read_csv('user_id', 'path/')` | Basic load |
+| `bc.read_csv('user_id', 'path/', 'antennas.csv')` | With antennas |
+| `bc.read_csv('user_id', 'path/', network=True)` | With network |
+| `bc.read_csv('user_id', 'path/', 'antennas.csv', network=True)` | Full load |
+| `bc.read_csv('user_id', 'path/', describe=True)` | Show summary |
+| `bc.read_csv('user_id', 'path/', warnings=False)` | Suppress warnings |
+
+## Properties to Check After Loading
+
+| Property | Meaning |
+|----------|---------|
+| `user.name` | User identifier |
+| `len(user.records)` | Number of records loaded |
+| `user.start_time` | First record timestamp |
+| `user.end_time` | Last record timestamp |
+| `user.has_call` | True if call records present |
+| `user.has_text` | True if text records present |
+| `user.has_home` | True if home location detected |
+| `len(user.antennas)` | Number of antennas loaded |
+| `user.has_network` | True if network data loaded |
+| `len(user.network)` | Number of correspondents |
+| `user.ignored_records` | Dict of ignored record counts |
+
+## Workflow
+
+### 1. Verify Environment
+
+```
+import bandicoot as bc; print(f'Bandicoot {bc.__version__} ready')
 ```
 
-### Step 2: Verify Files Exist
+### 2. Verify Files Exist
 
-Check that the records file exists:
+Use `dir` (Windows) or `ls` (Unix) to check file exists.
 
-```bash
-# On Windows
-dir "{records_path}\{user_id}.csv"
+### 3. Load User
 
-# On Unix
-ls -la "{records_path}/{user_id}.csv"
+```
+user = bc.read_csv('user_id', 'path/', describe=True)
 ```
 
-If antennas_path is provided, verify it exists too.
+### 4. Check Results
 
-### Step 3: Load User Data
-
-Execute the following Python code inline using `conda run -n bandicoot python -c "..."`.
-Do not save this as a separate script file.
-
-**With antennas file:**
-
-```python
-import bandicoot as bc
-
-user = bc.read_csv(
-    '{user_id}',
-    '{records_path}',
-    '{antennas_path}',
-    network={network_flag},  # True if --network provided, else False
-    describe=True,
-    warnings=True
-)
-
-# Additional summary
-print(f"\n=== Loading Summary ===")
-print(f"User ID: {user.name}")
-print(f"Records: {len(user.records)}")
-print(f"Date range: {user.start_time} to {user.end_time}")
-print(f"Has calls: {user.has_call}")
-print(f"Has texts: {user.has_text}")
-print(f"Has home: {user.has_home}")
-print(f"Antennas: {len(user.antennas)}")
-
-if user.ignored_records and user.ignored_records.get('all', 0) > 0:
-    print(f"\nWarning: {user.ignored_records['all']} records were ignored")
-    for key, count in user.ignored_records.items():
-        if key != 'all' and count > 0:
-            print(f"  - {key}: {count}")
-
-if user.has_network:
-    print(f"\nNetwork loaded: {len(user.network)} correspondents")
-    print(f"Out-of-network calls: {user.percent_outofnetwork_calls:.1%}")
-```
-
-**Without antennas file:**
-
-```python
-import bandicoot as bc
-
-user = bc.read_csv(
-    '{user_id}',
-    '{records_path}',
-    network={network_flag},
-    describe=True,
-    warnings=True
-)
-
-print(f"\n=== Loading Summary ===")
-print(f"User ID: {user.name}")
-print(f"Records: {len(user.records)}")
-print(f"Date range: {user.start_time} to {user.end_time}")
-print(f"Has calls: {user.has_call}")
-print(f"Has texts: {user.has_text}")
-```
-
-### Step 4: Report Results
-
-After loading, report to the user:
-
-1. **Success indicators**:
-   - Number of records loaded
-   - Date range of the data
-   - Number of unique contacts
-   - Whether home location was detected
-
-2. **Data quality notes**:
-   - Any ignored/filtered records
-   - Missing location data percentage
-   - Warnings from Bandicoot
-
-3. **Next steps**: Suggest running `/bandicoot:analyze` or `/bandicoot:quick-stats`
+Print key properties to verify successful load.
 
 ## Examples
 
-### Basic Load
-
+Basic load:
 ```
 /bandicoot:load ego demo/data/ demo/data/antennas.csv
 ```
@@ -149,48 +98,36 @@ Expected output:
 [x] Has calls
 ```
 
-### Load with Network
-
+Load with network:
 ```
 /bandicoot:load ego demo/data/ demo/data/antennas.csv --network
 ```
 
-This will also load correspondent data files from the same directory for network analysis.
-
-### Load Without Antennas
-
+Load without antennas (no spatial indicators):
 ```
 /bandicoot:load ego demo/data/
 ```
 
-Spatial indicators will not be available without antenna location data.
-
 ## Troubleshooting
 
-### File Not Found
+**File Not Found**
+- Verify user_id matches CSV filename (without .csv)
+- Check records_path is correct
+- List directory to see available files
 
-If the records file is not found:
-1. Verify the user_id matches the CSV filename (without .csv extension)
-2. Check the records_path is correct
-3. List files in the directory to see available users
+**No Records Loaded (count is 0)**
+- Check CSV format: datetime, interaction, direction, correspondent_id columns
+- Verify datetime format: `YYYY-MM-DD HH:MM:SS`
+- Ensure interaction values: 'call' or 'text'
+- Ensure direction values: 'in' or 'out'
 
-### No Records Loaded
-
-If records count is 0 or very low:
-1. Check CSV format (datetime, interaction, direction, correspondent_id columns)
-2. Verify datetime format is YYYY-MM-DD HH:MM:SS
-3. Ensure interaction values are 'call' or 'text'
-4. Ensure direction values are 'in' or 'out'
-
-### Missing Location Data
-
-If home is not detected or antennas count is 0:
-1. Verify antennas file path is correct
-2. Check antenna_id values match between records and antennas files
-3. Ensure antennas file has antenna_id, latitude, longitude columns
+**Missing Location Data / Home Not Detected**
+- Verify antennas file path
+- Check antenna_id values match between records and antennas files
+- Ensure antennas file has: antenna_id, latitude, longitude columns
 
 ## Notes
 
-- Each command execution is independent - the loaded user object does not persist
-- For continued analysis, use `/bandicoot:analyze` which handles loading internally
-- Use `--network` only when you need network analysis (slower loading)
+- Each command execution is independent - user object does not persist
+- For continued analysis, use `/bandicoot:analyze` which handles loading
+- Use `--network` only when needed (slower loading)
