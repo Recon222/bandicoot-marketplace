@@ -286,6 +286,72 @@
       filter: invert(1) brightness(0.9);
     }
 
+    /* Style Mapbox scale control */
+    .mapboxgl-ctrl-scale {
+      background: var(--glass-bg) !important;
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border: 1px solid var(--glass-border) !important;
+      border-radius: var(--radius-sm) !important;
+      font-family: var(--font-mono) !important;
+      font-size: 10px !important;
+      color: var(--text-secondary) !important;
+      padding: 2px 6px !important;
+      box-shadow: 0 4px 12px var(--glass-shadow) !important;
+    }
+
+    /* Style Mapbox popups */
+    .mapboxgl-popup {
+      z-index: var(--z-popup);
+    }
+
+    .mapboxgl-popup-content {
+      background: var(--glass-bg) !important;
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border: 1px solid var(--glass-border) !important;
+      border-radius: var(--radius-lg) !important;
+      box-shadow:
+        0 12px 40px var(--glass-shadow),
+        inset 0 1px 0 var(--glass-highlight) !important;
+      padding: 0 !important;
+      overflow: hidden;
+    }
+
+    .mapboxgl-popup-close-button {
+      color: var(--text-muted) !important;
+      font-size: 18px !important;
+      padding: 4px 10px !important;
+      right: 4px !important;
+      top: 4px !important;
+      transition: color var(--transition-fast);
+    }
+
+    .mapboxgl-popup-close-button:hover {
+      color: var(--text-primary) !important;
+      background: transparent !important;
+    }
+
+    .mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+    .mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+    .mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip {
+      border-bottom-color: var(--glass-bg) !important;
+    }
+
+    .mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+    .mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+    .mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip {
+      border-top-color: var(--glass-bg) !important;
+    }
+
+    .mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+      border-right-color: var(--glass-bg) !important;
+    }
+
+    .mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+      border-left-color: var(--glass-bg) !important;
+    }
+
     /* ============================================================
        SECTION: Glass Panel Base
        Premium glassmorphic panel styling
@@ -998,6 +1064,544 @@
     };
 
     // ============================================================
+    // MODULE: MapController
+    // Manages Mapbox GL JS map instance, styles, and interactions
+    // Could be extracted to: js/controllers/MapController.js
+    // ============================================================
+    const MapController = {
+      map: null,
+      popup: null,
+      _isStyleLoading: false,
+      _pendingOperations: [],
+
+      /**
+       * Initialize the map
+       * @returns {Promise} Resolves when map is loaded
+       */
+      async init() {
+        console.log('[MapController] Initializing...');
+
+        // Validate Mapbox token
+        const token = CONFIG.MAPBOX_TOKEN;
+        if (!token || token === '{{MAPBOX_TOKEN}}' || !token.startsWith('pk.')) {
+          console.warn('[MapController] No valid Mapbox token provided. Using demo mode.');
+          // In demo mode, we'll show a message instead of the map
+          this._showDemoMode();
+          return;
+        }
+
+        // Set access token
+        mapboxgl.accessToken = token;
+
+        // Determine initial style based on theme
+        const theme = State.get('theme');
+        const style = theme === 'dark' ? CONFIG.MAPBOX_STYLE_DARK : CONFIG.MAPBOX_STYLE_LIGHT;
+
+        // Create map instance
+        this.map = new mapboxgl.Map({
+          container: 'map',
+          style: style,
+          center: CONFIG.DEFAULT_CENTER,
+          zoom: CONFIG.DEFAULT_ZOOM,
+          attributionControl: false,
+          pitchWithRotate: false,
+          dragRotate: false,
+          touchZoomRotate: true,
+          maxZoom: 18,
+          minZoom: 1,
+          fadeDuration: 300
+        });
+
+        // Add navigation controls (zoom only, no compass)
+        this.map.addControl(
+          new mapboxgl.NavigationControl({
+            showCompass: false,
+            visualizePitch: false
+          }),
+          'bottom-right'
+        );
+
+        // Add scale control
+        this.map.addControl(
+          new mapboxgl.ScaleControl({
+            maxWidth: 100,
+            unit: 'metric'
+          }),
+          'bottom-left'
+        );
+
+        // Wait for map to load
+        await new Promise((resolve, reject) => {
+          this.map.on('load', resolve);
+          this.map.on('error', reject);
+        });
+
+        // Listen for theme changes
+        EventBus.on('theme:change', ({ theme }) => this._handleThemeChange(theme));
+
+        // Listen for filter updates
+        EventBus.on('filter:update', () => this.updateFilters());
+
+        // Emit map ready event
+        EventBus.emit('map:ready', { map: this.map });
+
+        console.log('[MapController] Map loaded successfully');
+      },
+
+      /**
+       * Show demo mode message when no token is available
+       */
+      _showDemoMode() {
+        const mapContainer = document.getElementById('map');
+        mapContainer.innerHTML = `
+          <div style="
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            text-align: center;
+            padding: var(--space-8);
+          ">
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color: var(--accent-primary); margin-bottom: var(--space-4);">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+            <h2 style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin-bottom: var(--space-2);">
+              Map Visualization Demo
+            </h2>
+            <p style="font-size: 14px; max-width: 400px; line-height: 1.6; margin-bottom: var(--space-4);">
+              To display the interactive map, provide a valid Mapbox access token when generating this visualization.
+            </p>
+            <code style="
+              font-family: var(--font-mono);
+              font-size: 12px;
+              background: var(--bg-surface);
+              padding: var(--space-2) var(--space-4);
+              border-radius: var(--radius-md);
+              color: var(--accent-primary);
+            ">
+              mapbox_token='pk.your_token_here'
+            </code>
+          </div>
+        `;
+        EventBus.emit('map:demo-mode');
+      },
+
+      /**
+       * Handle theme changes by switching map style
+       * @param {string} theme - 'dark' or 'light'
+       */
+      _handleThemeChange(theme) {
+        if (!this.map) return;
+
+        const style = theme === 'dark' ? CONFIG.MAPBOX_STYLE_DARK : CONFIG.MAPBOX_STYLE_LIGHT;
+
+        // Mark style as loading
+        this._isStyleLoading = true;
+
+        // Change map style with smooth transition
+        this.map.setStyle(style);
+
+        // Wait for style to load, then reapply custom layers
+        this.map.once('style.load', () => {
+          this._isStyleLoading = false;
+          this._reapplyLayers();
+          this._processPendingOperations();
+          console.log('[MapController] Style switched to:', theme);
+        });
+      },
+
+      /**
+       * Reapply custom data layers after style change
+       */
+      _reapplyLayers() {
+        const features = State.get('data.features');
+        if (features && features.length > 0) {
+          const geojson = { type: 'FeatureCollection', features };
+          if (this.map.getSource('events')) {
+            this.map.getSource('events').setData(geojson);
+          } else {
+            this._addDataLayers(geojson);
+          }
+        }
+      },
+
+      /**
+       * Process operations queued during style loading
+       */
+      _processPendingOperations() {
+        while (this._pendingOperations.length > 0) {
+          const operation = this._pendingOperations.shift();
+          try {
+            operation();
+          } catch (error) {
+            console.error('[MapController] Error processing pending operation:', error);
+          }
+        }
+      },
+
+      /**
+       * Load GeoJSON data and create visualization layers
+       * @param {Object} geojson - GeoJSON FeatureCollection
+       */
+      loadData(geojson) {
+        if (!this.map) {
+          console.warn('[MapController] Map not initialized');
+          return;
+        }
+
+        if (this._isStyleLoading) {
+          this._pendingOperations.push(() => this.loadData(geojson));
+          return;
+        }
+
+        console.log('[MapController] Loading data:', geojson.features.length, 'features');
+
+        // Remove existing layers and source if present
+        this._removeDataLayers();
+
+        // Add new layers
+        this._addDataLayers(geojson);
+
+        // Fit map to data bounds
+        this._fitToBounds(geojson);
+
+        EventBus.emit('map:data-loaded', { featureCount: geojson.features.length });
+      },
+
+      /**
+       * Add data source and layers
+       * @param {Object} geojson - GeoJSON FeatureCollection
+       */
+      _addDataLayers(geojson) {
+        // Add clustered source
+        this.map.addSource('events', {
+          type: 'geojson',
+          data: geojson,
+          cluster: true,
+          clusterMaxZoom: CONFIG.CLUSTER_MAX_ZOOM,
+          clusterRadius: CONFIG.CLUSTER_RADIUS,
+          clusterProperties: {
+            // Aggregate counts by event type
+            call_in: ['+', ['case', ['all',
+              ['==', ['get', 'interaction_type'], 'call'],
+              ['==', ['get', 'direction'], 'in']
+            ], 1, 0]],
+            call_out: ['+', ['case', ['all',
+              ['==', ['get', 'interaction_type'], 'call'],
+              ['==', ['get', 'direction'], 'out']
+            ], 1, 0]],
+            text_in: ['+', ['case', ['all',
+              ['==', ['get', 'interaction_type'], 'text'],
+              ['==', ['get', 'direction'], 'in']
+            ], 1, 0]],
+            text_out: ['+', ['case', ['all',
+              ['==', ['get', 'interaction_type'], 'text'],
+              ['==', ['get', 'direction'], 'out']
+            ], 1, 0]]
+          }
+        });
+
+        // Layer: Cluster circles with dynamic sizing and colors
+        this.map.addLayer({
+          id: 'clusters',
+          type: 'circle',
+          source: 'events',
+          filter: ['has', 'point_count'],
+          paint: {
+            // Color based on cluster size
+            'circle-color': [
+              'step',
+              ['get', 'point_count'],
+              '#00d4ff',  // < 10
+              10, '#7c3aed',  // 10-49
+              50, '#ff6b6b',  // 50-99
+              100, '#f59e0b'  // 100+
+            ],
+            // Size based on cluster size
+            'circle-radius': [
+              'step',
+              ['get', 'point_count'],
+              20,   // < 10
+              10, 26,   // 10-49
+              50, 32,   // 50-99
+              100, 40   // 100+
+            ],
+            'circle-stroke-width': 3,
+            'circle-stroke-color': 'rgba(255, 255, 255, 0.25)',
+            'circle-stroke-opacity': 1,
+            // Smooth transitions
+            'circle-opacity': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              0, 0.9,
+              CONFIG.CLUSTER_MAX_ZOOM, 0.7
+            ]
+          }
+        });
+
+        // Layer: Cluster count labels
+        this.map.addLayer({
+          id: 'cluster-count',
+          type: 'symbol',
+          source: 'events',
+          filter: ['has', 'point_count'],
+          layout: {
+            'text-field': ['get', 'point_count_abbreviated'],
+            'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+            'text-size': 13,
+            'text-allow-overlap': true
+          },
+          paint: {
+            'text-color': '#ffffff'
+          }
+        });
+
+        // Layer: Individual event points
+        this.map.addLayer({
+          id: 'unclustered-point',
+          type: 'circle',
+          source: 'events',
+          filter: ['!', ['has', 'point_count']],
+          paint: {
+            'circle-radius': [
+              'interpolate',
+              ['linear'],
+              ['zoom'],
+              0, 4,
+              10, 6,
+              18, 10
+            ],
+            // Color based on event type
+            'circle-color': [
+              'match',
+              ['concat', ['get', 'interaction_type'], '-', ['get', 'direction']],
+              'call-in', '#10b981',
+              'call-out', '#3b82f6',
+              'text-in', '#f59e0b',
+              'text-out', '#ec4899',
+              '#00d4ff' // Default
+            ],
+            'circle-stroke-width': 2,
+            'circle-stroke-color': 'rgba(255, 255, 255, 0.5)',
+            'circle-opacity': 0.9
+          }
+        });
+
+        // Add interactive cursors
+        this.map.on('mouseenter', 'clusters', () => {
+          this.map.getCanvas().style.cursor = 'pointer';
+        });
+        this.map.on('mouseleave', 'clusters', () => {
+          this.map.getCanvas().style.cursor = '';
+        });
+        this.map.on('mouseenter', 'unclustered-point', () => {
+          this.map.getCanvas().style.cursor = 'pointer';
+        });
+        this.map.on('mouseleave', 'unclustered-point', () => {
+          this.map.getCanvas().style.cursor = '';
+        });
+
+        // Cluster click: zoom in
+        this.map.on('click', 'clusters', (e) => this._handleClusterClick(e));
+
+        // Point click: show popup
+        this.map.on('click', 'unclustered-point', (e) => this._handlePointClick(e));
+      },
+
+      /**
+       * Remove data layers and source
+       */
+      _removeDataLayers() {
+        const layers = ['unclustered-point', 'cluster-count', 'clusters'];
+        layers.forEach(layer => {
+          if (this.map.getLayer(layer)) {
+            this.map.removeLayer(layer);
+          }
+        });
+        if (this.map.getSource('events')) {
+          this.map.removeSource('events');
+        }
+      },
+
+      /**
+       * Fit map view to data bounds
+       * @param {Object} geojson - GeoJSON FeatureCollection
+       */
+      _fitToBounds(geojson) {
+        if (!geojson.features.length) return;
+
+        const bounds = new mapboxgl.LngLatBounds();
+        geojson.features.forEach(feature => {
+          if (feature.geometry && feature.geometry.coordinates) {
+            bounds.extend(feature.geometry.coordinates);
+          }
+        });
+
+        if (!bounds.isEmpty()) {
+          this.map.fitBounds(bounds, {
+            padding: { top: 100, bottom: 150, left: 350, right: 100 },
+            maxZoom: 12,
+            duration: 1000
+          });
+        }
+      },
+
+      /**
+       * Handle cluster click - zoom to expand
+       * @param {Object} e - Map click event
+       */
+      _handleClusterClick(e) {
+        const features = this.map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
+        if (!features.length) return;
+
+        const clusterId = features[0].properties.cluster_id;
+        const source = this.map.getSource('events');
+
+        source.getClusterExpansionZoom(clusterId, (err, zoom) => {
+          if (err) return;
+          this.map.easeTo({
+            center: features[0].geometry.coordinates,
+            zoom: zoom + 1,
+            duration: 500
+          });
+        });
+      },
+
+      /**
+       * Handle individual point click - show popup
+       * (Popup content will be enhanced in Phase 7)
+       * @param {Object} e - Map click event
+       */
+      _handlePointClick(e) {
+        const feature = e.features[0];
+        const props = feature.properties;
+
+        // Create popup content (basic for now, enhanced in Phase 7)
+        const type = props.interaction_type;
+        const dir = props.direction;
+        const typeLabel = `${dir === 'in' ? 'Incoming' : 'Outgoing'} ${type === 'call' ? 'Call' : 'Text'}`;
+
+        // Format timestamp
+        const date = new Date(props.timestamp);
+        const dateStr = date.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+        const timeStr = date.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+
+        // Simple popup HTML (will be enhanced in Phase 7)
+        const html = `
+          <div style="
+            font-family: var(--font-primary);
+            padding: 12px;
+            min-width: 200px;
+          ">
+            <div style="
+              font-weight: 600;
+              font-size: 14px;
+              color: var(--text-primary);
+              margin-bottom: 8px;
+            ">${typeLabel}</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">
+              <div style="margin-bottom: 4px;">${dateStr}</div>
+              <div style="font-family: var(--font-mono);">${timeStr}</div>
+              ${props.correspondent_id ? `<div style="margin-top: 8px; color: var(--text-muted);">Contact: ${props.correspondent_id}</div>` : ''}
+            </div>
+          </div>
+        `;
+
+        // Remove existing popup
+        if (this.popup) {
+          this.popup.remove();
+        }
+
+        // Create and show new popup
+        this.popup = new mapboxgl.Popup({
+          closeButton: true,
+          closeOnClick: true,
+          maxWidth: CONFIG.POPUP_MAX_WIDTH,
+          className: 'bandicoot-popup'
+        })
+          .setLngLat(feature.geometry.coordinates)
+          .setHTML(html)
+          .addTo(this.map);
+      },
+
+      /**
+       * Update map filters based on current state
+       */
+      updateFilters() {
+        if (!this.map || !this.map.getSource('events')) return;
+
+        if (this._isStyleLoading) {
+          this._pendingOperations.push(() => this.updateFilters());
+          return;
+        }
+
+        const currentTime = State.get('time.current');
+        const selectedContacts = State.get('contacts.selected');
+        const contactMode = State.get('contacts.mode');
+
+        // Build filter expression
+        let filter = ['all'];
+
+        // Time filter: show events up to current time
+        if (currentTime !== null) {
+          filter.push(['<=', ['get', 'timestamp'], currentTime]);
+        }
+
+        // Contact filter: show only selected contacts
+        if (contactMode !== 'all' && selectedContacts.length > 0) {
+          filter.push(['in', ['get', 'correspondent_id'], ['literal', selectedContacts]]);
+        } else if (contactMode === 'none' || (contactMode !== 'all' && selectedContacts.length === 0)) {
+          // Hide all if none selected
+          filter.push(['==', 1, 0]); // Always false
+        }
+
+        // Apply filter to unclustered points
+        const pointFilter = filter.length > 1 ? filter : ['!', ['has', 'point_count']];
+        this.map.setFilter('unclustered-point', ['all', ['!', ['has', 'point_count']], ...filter.slice(1)]);
+
+        console.log('[MapController] Filters updated');
+      },
+
+      /**
+       * Fly to a specific location
+       * @param {Array} center - [lng, lat]
+       * @param {number} zoom - Zoom level
+       */
+      flyTo(center, zoom = 12) {
+        if (!this.map) return;
+        this.map.flyTo({
+          center,
+          zoom,
+          duration: 1500,
+          essential: true
+        });
+      },
+
+      /**
+       * Get the map instance
+       * @returns {Object} Mapbox map instance
+       */
+      getMap() {
+        return this.map;
+      }
+    };
+
+    // ============================================================
     // MODULE: Application Bootstrap
     // Initializes all modules and starts the application
     // Could be extracted to: js/main.js
@@ -1005,42 +1609,55 @@
     async function initializeApp() {
       console.log('[App] Starting initialization...');
 
+      const loadingText = document.querySelector('.loading-text');
+      const loadingSubtext = document.querySelector('.loading-subtext');
+
       try {
-        // Phase 1: Initialize core modules
+        // Phase 1: Initialize theme
+        if (loadingText) loadingText.textContent = 'Loading Theme System';
+        if (loadingSubtext) loadingSubtext.textContent = 'Initializing preferences...';
         ThemeController.init();
 
-        // Update loading text
-        const loadingText = document.querySelector('.loading-text');
-        const loadingSubtext = document.querySelector('.loading-subtext');
+        // Phase 2: Initialize map
+        if (loadingText) loadingText.textContent = 'Loading Map';
+        if (loadingSubtext) loadingSubtext.textContent = 'Initializing Mapbox GL JS...';
+        await MapController.init();
 
-        if (loadingText) loadingText.textContent = 'Foundation Ready';
-        if (loadingSubtext) loadingSubtext.textContent = 'Phase 1 complete - Theme system active';
+        // Map is ready - update status
+        if (loadingText) loadingText.textContent = 'Map Ready';
+        if (loadingSubtext) loadingSubtext.textContent = 'Visualization loaded successfully';
 
-        // For Phase 1, just show the theme toggle working
-        // Additional initialization will be added in subsequent phases
+        // If we have embedded data, load it
+        if (window.BANDICOOT_DATA && window.BANDICOOT_DATA.features) {
+          if (loadingText) loadingText.textContent = 'Loading Data';
+          if (loadingSubtext) loadingSubtext.textContent = `Processing ${window.BANDICOOT_DATA.features.length} events...`;
 
-        // Hide loading overlay after a brief delay
+          // Small delay to show the message
+          await new Promise(resolve => setTimeout(resolve, 300));
+
+          MapController.loadData(window.BANDICOOT_DATA);
+        }
+
+        // Hide loading overlay
         setTimeout(() => {
           const overlay = document.getElementById('loadingOverlay');
           if (overlay) {
             overlay.classList.add('loading-overlay--hidden');
           }
-        }, 1000);
+        }, 500);
 
-        console.log('[App] Phase 1 initialization complete');
+        console.log('[App] Initialization complete');
 
       } catch (error) {
         console.error('[App] Initialization failed:', error);
 
-        const loadingText = document.querySelector('.loading-text');
         if (loadingText) {
           loadingText.textContent = 'Initialization Failed';
           loadingText.style.color = 'var(--accent-secondary)';
         }
 
-        const loadingSubtext = document.querySelector('.loading-subtext');
         if (loadingSubtext) {
-          loadingSubtext.textContent = error.message;
+          loadingSubtext.textContent = error.message || 'Unknown error occurred';
         }
       }
     }
