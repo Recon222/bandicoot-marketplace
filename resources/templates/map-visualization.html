@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bandicoot CDR Visualization</title>
+
+  <!-- ============================================================
+       SECTION: External Dependencies (CDN)
+       ============================================================ -->
+
+  <!-- Mapbox GL JS v3.3.0 -->
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+
+  <!-- Fonts: JetBrains Mono for technical data, Inter for UI -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* ============================================================
+       SECTION: CSS Reset & Base
+       Establishes consistent rendering across all browsers
+       Could be extracted to: css/reset.css
+       ============================================================ */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      font-family: var(--font-primary);
+      background: var(--bg-void);
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+
+    input {
+      font-family: inherit;
+      border: none;
+      background: none;
+      outline: none;
+    }
+
+    /* ============================================================
+       SECTION: CSS Variables & Design Tokens
+       "Obsidian Lux" Design System
+       Could be extracted to: css/variables.css
+       ============================================================ */
+    :root {
+      /* Typography */
+      --font-primary: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+
+      /* Spacing Scale (4px base) */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --space-8: 32px;
+      --space-10: 40px;
+      --space-12: 48px;
+      --space-16: 64px;
+
+      /* Border Radius */
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --radius-xl: 24px;
+      --radius-full: 9999px;
+
+      /* Transitions - Smooth, premium feel */
+      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-out-quad: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+      --transition-fast: 150ms var(--ease-out-quad);
+      --transition-base: 250ms var(--ease-out-expo);
+      --transition-slow: 400ms var(--ease-out-expo);
+      --transition-slower: 600ms var(--ease-out-expo);
+
+      /* Z-Index Scale */
+      --z-map: 0;
+      --z-controls: 100;
+      --z-dropdown: 200;
+      --z-popup: 300;
+      --z-modal: 400;
+      --z-loading: 9999;
+
+      /* Shadows */
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    /* ============================================================
+       SECTION: Dark Theme - "Obsidian"
+       Deep blue-blacks with electric cyan accents
+       ============================================================ */
+    :root[data-theme="dark"] {
+      /* Base Colors - Deep blue-black, not pure black */
+      --bg-void: #05070a;
+      --bg-primary: #0a0e14;
+      --bg-elevated: #111820;
+      --bg-surface: #1a2332;
+      --bg-hover: #232f42;
+
+      /* Text Colors - Warm whites for readability */
+      --text-primary: #f0f4f8;
+      --text-secondary: #8899a6;
+      --text-muted: #4a5568;
+      --text-disabled: #2d3748;
+
+      /* Accent Colors */
+      --accent-primary: #00d4ff;
+      --accent-primary-hover: #33ddff;
+      --accent-secondary: #ff6b6b;
+      --accent-tertiary: #7c3aed;
+      --accent-glow: rgba(0, 212, 255, 0.4);
+      --accent-glow-strong: rgba(0, 212, 255, 0.6);
+
+      /* Event Type Colors - Distinct, colorblind-friendly palette */
+      --color-call-in: #10b981;
+      --color-call-out: #3b82f6;
+      --color-text-in: #f59e0b;
+      --color-text-out: #ec4899;
+
+      /* Event Type Backgrounds */
+      --color-call-in-bg: rgba(16, 185, 129, 0.15);
+      --color-call-out-bg: rgba(59, 130, 246, 0.15);
+      --color-text-in-bg: rgba(245, 158, 11, 0.15);
+      --color-text-out-bg: rgba(236, 72, 153, 0.15);
+
+      /* Glassmorphic Properties */
+      --glass-bg: rgba(10, 14, 20, 0.85);
+      --glass-bg-hover: rgba(17, 24, 32, 0.9);
+      --glass-border: rgba(255, 255, 255, 0.06);
+      --glass-border-hover: rgba(255, 255, 255, 0.1);
+      --glass-highlight: rgba(255, 255, 255, 0.03);
+      --glass-shadow: rgba(0, 0, 0, 0.5);
+      --glass-blur: 20px;
+
+      /* Mapbox Style */
+      --map-style: mapbox://styles/mapbox/dark-v11;
+
+      /* Scrollbar */
+      --scrollbar-track: rgba(255, 255, 255, 0.02);
+      --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+      --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
+    }
+
+    /* ============================================================
+       SECTION: Light Theme - "Porcelain"
+       Warm off-whites with deeper accent tones
+       ============================================================ */
+    :root[data-theme="light"] {
+      /* Base Colors - Warm off-whites */
+      --bg-void: #f8fafc;
+      --bg-primary: #ffffff;
+      --bg-elevated: #ffffff;
+      --bg-surface: #f1f5f9;
+      --bg-hover: #e2e8f0;
+
+      /* Text Colors - Rich blacks */
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --text-disabled: #cbd5e1;
+
+      /* Accent Colors - Deeper variants for contrast */
+      --accent-primary: #0891b2;
+      --accent-primary-hover: #0e7490;
+      --accent-secondary: #e11d48;
+      --accent-tertiary: #6d28d9;
+      --accent-glow: rgba(8, 145, 178, 0.2);
+      --accent-glow-strong: rgba(8, 145, 178, 0.35);
+
+      /* Event Type Colors */
+      --color-call-in: #059669;
+      --color-call-out: #2563eb;
+      --color-text-in: #d97706;
+      --color-text-out: #db2777;
+
+      /* Event Type Backgrounds */
+      --color-call-in-bg: rgba(5, 150, 105, 0.1);
+      --color-call-out-bg: rgba(37, 99, 235, 0.1);
+      --color-text-in-bg: rgba(217, 119, 6, 0.1);
+      --color-text-out-bg: rgba(219, 39, 119, 0.1);
+
+      /* Glassmorphic Properties - Lighter, crisper */
+      --glass-bg: rgba(255, 255, 255, 0.92);
+      --glass-bg-hover: rgba(255, 255, 255, 0.96);
+      --glass-border: rgba(0, 0, 0, 0.06);
+      --glass-border-hover: rgba(0, 0, 0, 0.1);
+      --glass-highlight: rgba(255, 255, 255, 0.8);
+      --glass-shadow: rgba(0, 0, 0, 0.08);
+      --glass-blur: 16px;
+
+      /* Mapbox Style */
+      --map-style: mapbox://styles/mapbox/light-v11;
+
+      /* Scrollbar */
+      --scrollbar-track: rgba(0, 0, 0, 0.02);
+      --scrollbar-thumb: rgba(0, 0, 0, 0.1);
+      --scrollbar-thumb-hover: rgba(0, 0, 0, 0.2);
+    }
+
+    /* ============================================================
+       SECTION: Theme Transition
+       Smooth cross-fade when switching themes
+       ============================================================ */
+    html {
+      transition: background-color var(--transition-slow);
+    }
+
+    /* ============================================================
+       SECTION: Map Container
+       Full viewport coverage
+       Could be extracted to: css/components/map.css
+       ============================================================ */
+    #map {
+      position: absolute;
+      inset: 0;
+      z-index: var(--z-map);
+    }
+
+    /* Hide default Mapbox attribution - we'll add custom */
+    .mapboxgl-ctrl-attrib {
+      display: none !important;
+    }
+
+    /* Style Mapbox navigation controls */
+    .mapboxgl-ctrl-group {
+      background: var(--glass-bg) !important;
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border: 1px solid var(--glass-border) !important;
+      border-radius: var(--radius-md) !important;
+      box-shadow: 0 8px 32px var(--glass-shadow) !important;
+      overflow: hidden;
+    }
+
+    .mapboxgl-ctrl-group button {
+      width: 36px !important;
+      height: 36px !important;
+      background: transparent !important;
+      border: none !important;
+      color: var(--text-primary) !important;
+    }
+
+    .mapboxgl-ctrl-group button:hover {
+      background: var(--bg-hover) !important;
+    }
+
+    .mapboxgl-ctrl-group button + button {
+      border-top: 1px solid var(--glass-border) !important;
+    }
+
+    .mapboxgl-ctrl-group button .mapboxgl-ctrl-icon {
+      filter: var(--text-primary) == '#f0f4f8' ? invert(1) : none;
+    }
+
+    [data-theme="dark"] .mapboxgl-ctrl-group button .mapboxgl-ctrl-icon {
+      filter: invert(1) brightness(0.9);
+    }
+
+    /* ============================================================
+       SECTION: Glass Panel Base
+       Premium glassmorphic panel styling
+       Could be extracted to: css/components/glass-panel.css
+       ============================================================ */
+    .glass-panel {
+      background: var(--glass-bg);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      box-shadow:
+        0 8px 32px var(--glass-shadow),
+        inset 0 1px 0 var(--glass-highlight),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+      transition:
+        transform var(--transition-base),
+        box-shadow var(--transition-base),
+        border-color var(--transition-base);
+    }
+
+    .glass-panel:hover {
+      border-color: var(--glass-border-hover);
+      box-shadow:
+        0 12px 40px var(--glass-shadow),
+        inset 0 1px 0 var(--glass-highlight),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    /* Active/focused state with accent glow */
+    .glass-panel--active,
+    .glass-panel:focus-within {
+      border-color: var(--accent-primary);
+      box-shadow:
+        0 0 0 1px var(--accent-primary),
+        0 0 30px var(--accent-glow),
+        0 8px 32px var(--glass-shadow),
+        inset 0 1px 0 var(--glass-highlight);
+    }
+
+    /* ============================================================
+       SECTION: Control Panel Layout
+       Floating panels positioned around the viewport
+       Could be extracted to: css/layout/controls.css
+       ============================================================ */
+    .controls-top-left {
+      position: absolute;
+      top: var(--space-6);
+      left: var(--space-6);
+      z-index: var(--z-controls);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      max-height: calc(100vh - var(--space-12) - 200px);
+    }
+
+    .controls-top-right {
+      position: absolute;
+      top: var(--space-6);
+      right: var(--space-6);
+      z-index: var(--z-controls);
+    }
+
+    .controls-bottom {
+      position: absolute;
+      bottom: var(--space-6);
+      left: var(--space-6);
+      right: var(--space-6);
+      z-index: var(--z-controls);
+    }
+
+    /* ============================================================
+       SECTION: Theme Toggle Button
+       Sun/Moon icon toggle with smooth transitions
+       Could be extracted to: css/components/theme-toggle.css
+       ============================================================ */
+    .theme-toggle {
+      width: 48px;
+      height: 48px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-primary);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .theme-toggle:hover {
+      color: var(--accent-primary);
+      transform: translateY(-2px);
+    }
+
+    .theme-toggle:active {
+      transform: translateY(0);
+    }
+
+    .theme-toggle svg {
+      width: 22px;
+      height: 22px;
+      transition:
+        transform var(--transition-base),
+        opacity var(--transition-base);
+      position: absolute;
+    }
+
+    .theme-toggle:hover svg {
+      transform: rotate(15deg);
+    }
+
+    /* Sun icon visible in dark mode (switch to light) */
+    .theme-toggle__sun {
+      opacity: 1;
+      transform: rotate(0deg) scale(1);
+    }
+
+    /* Moon icon visible in light mode (switch to dark) */
+    .theme-toggle__moon {
+      opacity: 0;
+      transform: rotate(-90deg) scale(0.5);
+    }
+
+    [data-theme="light"] .theme-toggle__sun {
+      opacity: 0;
+      transform: rotate(90deg) scale(0.5);
+    }
+
+    [data-theme="light"] .theme-toggle__moon {
+      opacity: 1;
+      transform: rotate(0deg) scale(1);
+    }
+
+    /* ============================================================
+       SECTION: Loading Overlay
+       Full-screen loading state with spinner
+       Could be extracted to: css/components/loading.css
+       ============================================================ */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: var(--bg-void);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: var(--z-loading);
+      transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+    }
+
+    .loading-overlay--hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 3px solid var(--glass-border);
+      border-top-color: var(--accent-primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    .loading-text {
+      margin-top: var(--space-4);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      letter-spacing: 0.02em;
+    }
+
+    .loading-subtext {
+      margin-top: var(--space-2);
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    /* ============================================================
+       SECTION: Keyframe Animations
+       Reusable animations for various components
+       Could be extracted to: css/animations.css
+       ============================================================ */
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes scaleIn {
+      from {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    @keyframes glow {
+      0%, 100% {
+        box-shadow: 0 0 20px var(--accent-glow);
+      }
+      50% {
+        box-shadow: 0 0 40px var(--accent-glow-strong);
+      }
+    }
+
+    /* Entrance animations for control panels */
+    .controls-top-left {
+      animation: fadeInDown 0.6s var(--ease-out-expo) 0.2s backwards;
+    }
+
+    .controls-top-right {
+      animation: fadeInDown 0.6s var(--ease-out-expo) 0.3s backwards;
+    }
+
+    .controls-bottom {
+      animation: fadeInUp 0.6s var(--ease-out-expo) 0.4s backwards;
+    }
+
+    /* ============================================================
+       SECTION: Custom Scrollbar
+       Styled scrollbars for glassmorphic panels
+       ============================================================ */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+      border-radius: var(--radius-full);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border-radius: var(--radius-full);
+      transition: background var(--transition-fast);
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-thumb-hover);
+    }
+
+    /* Firefox */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    }
+
+    /* ============================================================
+       SECTION: Utility Classes
+       Common utility patterns
+       ============================================================ */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .text-mono {
+      font-family: var(--font-mono);
+    }
+
+    .text-muted {
+      color: var(--text-muted);
+    }
+
+    .text-accent {
+      color: var(--accent-primary);
+    }
+
+    /* ============================================================
+       SECTION: Responsive Breakpoints
+       Mobile-first responsive adjustments
+       Could be extracted to: css/responsive.css
+       ============================================================ */
+    @media (max-width: 1024px) {
+      :root {
+        --space-6: 20px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      :root {
+        --space-6: 16px;
+      }
+
+      .controls-top-left {
+        top: var(--space-4);
+        left: var(--space-4);
+        max-height: calc(100vh - 180px);
+      }
+
+      .controls-top-right {
+        top: var(--space-4);
+        right: var(--space-4);
+      }
+
+      .controls-bottom {
+        left: var(--space-4);
+        right: var(--space-4);
+        bottom: var(--space-4);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .controls-top-left,
+      .controls-top-right {
+        position: static;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- ============================================================
+       Loading Overlay
+       Shown during initialization, fades out when ready
+       ============================================================ -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Initializing Visualization</div>
+    <div class="loading-subtext">Loading map and data...</div>
+  </div>
+
+  <!-- ============================================================
+       Map Container
+       Full viewport Mapbox GL JS map
+       ============================================================ -->
+  <div id="map"></div>
+
+  <!-- ============================================================
+       Top Left Controls
+       Theme toggle and contact filter
+       ============================================================ -->
+  <div class="controls-top-left">
+    <!-- Theme Toggle Button -->
+    <button class="theme-toggle glass-panel" id="themeToggle" aria-label="Toggle dark/light theme">
+      <!-- Sun icon (visible in dark mode) -->
+      <svg class="theme-toggle__sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/>
+        <line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+      <!-- Moon icon (visible in light mode) -->
+      <svg class="theme-toggle__moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+    </button>
+
+    <!-- Contact Filter Panel (placeholder - will be populated in Phase 5) -->
+    <div class="contact-filter glass-panel" id="contactFilter">
+      <!-- Content added in Phase 5 -->
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Top Right Controls
+       World clock display
+       ============================================================ -->
+  <div class="controls-top-right">
+    <!-- World Clock (placeholder - will be populated in Phase 4) -->
+    <div class="world-clock glass-panel" id="worldClock">
+      <!-- Content added in Phase 4 -->
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Bottom Controls
+       Time slider, playback controls, date picker
+       ============================================================ -->
+  <div class="controls-bottom">
+    <div class="time-controls glass-panel" id="timeControls">
+      <!-- Content added in Phase 4 -->
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // MODULE: Configuration & Constants
+    // Centralized configuration for the visualization
+    // Could be extracted to: js/config.js
+    // ============================================================
+    const CONFIG = {
+      // Mapbox configuration
+      MAPBOX_TOKEN: '{{MAPBOX_TOKEN}}',
+      MAPBOX_STYLE_DARK: 'mapbox://styles/mapbox/dark-v11',
+      MAPBOX_STYLE_LIGHT: 'mapbox://styles/mapbox/light-v11',
+
+      // Map defaults
+      DEFAULT_CENTER: [0, 20],
+      DEFAULT_ZOOM: 2,
+
+      // Clustering configuration
+      CLUSTER_MAX_ZOOM: 14,
+      CLUSTER_RADIUS: 50,
+
+      // Animation configuration
+      ANIMATION_TICK_MS: 100,
+      TIME_SCALE_FACTOR: 3600000, // 1 real second = 1 hour of data at 1x speed
+
+      // UI configuration
+      DEBOUNCE_MS: 150,
+
+      // Popup configuration
+      POPUP_MAX_WIDTH: '300px',
+    };
+
+    // ============================================================
+    // MODULE: EventBus
+    // Lightweight publish/subscribe system for decoupled communication
+    // Could be extracted to: js/core/EventBus.js
+    // ============================================================
+    const EventBus = {
+      _events: new Map(),
+      _onceEvents: new Set(),
+
+      /**
+       * Subscribe to an event
+       * @param {string} event - Event name
+       * @param {Function} callback - Handler function
+       * @returns {Function} Unsubscribe function
+       */
+      on(event, callback) {
+        if (!this._events.has(event)) {
+          this._events.set(event, new Set());
+        }
+        this._events.get(event).add(callback);
+
+        // Return unsubscribe function
+        return () => this.off(event, callback);
+      },
+
+      /**
+       * Subscribe to an event once
+       * @param {string} event - Event name
+       * @param {Function} callback - Handler function
+       */
+      once(event, callback) {
+        const wrapper = (data) => {
+          callback(data);
+          this.off(event, wrapper);
+        };
+        this._onceEvents.add(wrapper);
+        this.on(event, wrapper);
+      },
+
+      /**
+       * Unsubscribe from an event
+       * @param {string} event - Event name
+       * @param {Function} callback - Handler function
+       */
+      off(event, callback) {
+        const handlers = this._events.get(event);
+        if (handlers) {
+          handlers.delete(callback);
+        }
+      },
+
+      /**
+       * Emit an event with optional data
+       * @param {string} event - Event name
+       * @param {*} data - Event data
+       */
+      emit(event, data) {
+        const handlers = this._events.get(event);
+        if (handlers) {
+          handlers.forEach(callback => {
+            try {
+              callback(data);
+            } catch (error) {
+              console.error(`[EventBus] Error in handler for "${event}":`, error);
+            }
+          });
+        }
+      },
+
+      /**
+       * Clear all event subscriptions
+       */
+      clear() {
+        this._events.clear();
+        this._onceEvents.clear();
+      }
+    };
+
+    // ============================================================
+    // MODULE: StateManager
+    // Single source of truth for application state
+    // Could be extracted to: js/core/StateManager.js
+    // ============================================================
+    const State = {
+      _state: {
+        // Theme state
+        theme: 'dark',
+
+        // Time state
+        time: {
+          current: null,
+          start: null,
+          end: null,
+          isPlaying: false,
+          speed: 1
+        },
+
+        // Contact filter state
+        contacts: {
+          all: [],
+          selected: [],
+          mode: 'all' // 'all', 'selected', 'top10', 'none'
+        },
+
+        // Data state
+        data: {
+          features: [],
+          loaded: false,
+          loading: false
+        },
+
+        // UI state
+        ui: {
+          contactFilterOpen: false,
+          datePickerOpen: false
+        }
+      },
+
+      _listeners: new Set(),
+
+      /**
+       * Get a value from state by dot-notation path
+       * @param {string} path - Dot-notation path (e.g., 'time.current')
+       * @returns {*} Value at path
+       */
+      get(path) {
+        return path.split('.').reduce((obj, key) => obj?.[key], this._state);
+      },
+
+      /**
+       * Set a value in state by dot-notation path
+       * @param {string} path - Dot-notation path
+       * @param {*} value - New value
+       */
+      set(path, value) {
+        const keys = path.split('.');
+        const lastKey = keys.pop();
+        const target = keys.reduce((obj, key) => {
+          if (obj[key] === undefined) obj[key] = {};
+          return obj[key];
+        }, this._state);
+
+        const oldValue = target[lastKey];
+        target[lastKey] = value;
+
+        // Notify listeners
+        this._listeners.forEach(callback => {
+          try {
+            callback(path, value, oldValue);
+          } catch (error) {
+            console.error(`[State] Error in listener:`, error);
+          }
+        });
+
+        // Emit state change event
+        EventBus.emit('state:change', { path, value, oldValue });
+      },
+
+      /**
+       * Subscribe to state changes
+       * @param {Function} callback - Handler function (path, newValue, oldValue)
+       * @returns {Function} Unsubscribe function
+       */
+      subscribe(callback) {
+        this._listeners.add(callback);
+        return () => this._listeners.delete(callback);
+      },
+
+      /**
+       * Update multiple state values at once
+       * @param {Object} updates - Object with path: value pairs
+       */
+      batch(updates) {
+        Object.entries(updates).forEach(([path, value]) => {
+          this.set(path, value);
+        });
+      },
+
+      /**
+       * Get a snapshot of the entire state
+       * @returns {Object} State snapshot
+       */
+      snapshot() {
+        return JSON.parse(JSON.stringify(this._state));
+      }
+    };
+
+    // ============================================================
+    // MODULE: ThemeController
+    // Manages dark/light theme switching
+    // Could be extracted to: js/controllers/ThemeController.js
+    // ============================================================
+    const ThemeController = {
+      _storageKey: 'bandicoot-cdr-theme',
+
+      /**
+       * Initialize theme controller
+       */
+      init() {
+        // Check for saved preference
+        const saved = localStorage.getItem(this._storageKey);
+
+        // Check system preference
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        // Determine initial theme
+        const initialTheme = saved || (prefersDark ? 'dark' : 'light');
+        this.setTheme(initialTheme, false);
+
+        // Listen for theme toggle clicks
+        const toggle = document.getElementById('themeToggle');
+        if (toggle) {
+          toggle.addEventListener('click', () => this.toggle());
+        }
+
+        // Listen for system preference changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+          if (!localStorage.getItem(this._storageKey)) {
+            this.setTheme(e.matches ? 'dark' : 'light');
+          }
+        });
+
+        console.log('[ThemeController] Initialized with theme:', initialTheme);
+      },
+
+      /**
+       * Set the current theme
+       * @param {string} theme - 'dark' or 'light'
+       * @param {boolean} save - Whether to save preference
+       */
+      setTheme(theme, save = true) {
+        document.documentElement.setAttribute('data-theme', theme);
+        State.set('theme', theme);
+
+        if (save) {
+          localStorage.setItem(this._storageKey, theme);
+        }
+
+        EventBus.emit('theme:change', { theme });
+      },
+
+      /**
+       * Toggle between dark and light themes
+       */
+      toggle() {
+        const current = State.get('theme');
+        this.setTheme(current === 'dark' ? 'light' : 'dark');
+      },
+
+      /**
+       * Get the current theme
+       * @returns {string} Current theme
+       */
+      current() {
+        return State.get('theme');
+      }
+    };
+
+    // ============================================================
+    // MODULE: Application Bootstrap
+    // Initializes all modules and starts the application
+    // Could be extracted to: js/main.js
+    // ============================================================
+    async function initializeApp() {
+      console.log('[App] Starting initialization...');
+
+      try {
+        // Phase 1: Initialize core modules
+        ThemeController.init();
+
+        // Update loading text
+        const loadingText = document.querySelector('.loading-text');
+        const loadingSubtext = document.querySelector('.loading-subtext');
+
+        if (loadingText) loadingText.textContent = 'Foundation Ready';
+        if (loadingSubtext) loadingSubtext.textContent = 'Phase 1 complete - Theme system active';
+
+        // For Phase 1, just show the theme toggle working
+        // Additional initialization will be added in subsequent phases
+
+        // Hide loading overlay after a brief delay
+        setTimeout(() => {
+          const overlay = document.getElementById('loadingOverlay');
+          if (overlay) {
+            overlay.classList.add('loading-overlay--hidden');
+          }
+        }, 1000);
+
+        console.log('[App] Phase 1 initialization complete');
+
+      } catch (error) {
+        console.error('[App] Initialization failed:', error);
+
+        const loadingText = document.querySelector('.loading-text');
+        if (loadingText) {
+          loadingText.textContent = 'Initialization Failed';
+          loadingText.style.color = 'var(--accent-secondary)';
+        }
+
+        const loadingSubtext = document.querySelector('.loading-subtext');
+        if (loadingSubtext) {
+          loadingSubtext.textContent = error.message;
+        }
+      }
+    }
+
+    // Start the application when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeApp);
+    } else {
+      initializeApp();
+    }
+
+    // ============================================================
+    // DATA: Embedded GeoJSON
+    // This will be populated by the Python generation script
+    // or with sample data for testing
+    // ============================================================
+    window.BANDICOOT_DATA = null; // Will be set to {{GEOJSON_DATA}} by generator
+
+  </script>
+</body>
+</html>
