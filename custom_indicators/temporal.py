@@ -42,8 +42,7 @@ def hourly_activity_profile(records):
     return {h: hours.get(h, 0) for h in range(24)}
 
 
-@grouping
-def communication_gaps(records, threshold_hours=24):
+def communication_gaps(user, threshold_hours=24):
     """
     Detect unusual periods of silence.
 
@@ -54,6 +53,7 @@ def communication_gaps(records, threshold_hours=24):
 
     Parameters
     ----------
+    user : bandicoot.core.User
     threshold_hours : int
         Minimum gap duration to report (default 24 hours)
 
@@ -62,6 +62,7 @@ def communication_gaps(records, threshold_hours=24):
     list of dict
         Each gap: {'start': datetime, 'end': datetime, 'duration_hours': float}
     """
+    records = user.records
     if len(records) < 2:
         return []
 
@@ -81,8 +82,7 @@ def communication_gaps(records, threshold_hours=24):
     return gaps
 
 
-@grouping
-def activity_bursts(records, window_minutes=30, threshold_multiplier=3):
+def activity_bursts(user, window_minutes=30, threshold_multiplier=3):
     """
     Identify periods of unusually high activity.
 
@@ -93,6 +93,7 @@ def activity_bursts(records, window_minutes=30, threshold_multiplier=3):
 
     Parameters
     ----------
+    user : bandicoot.core.User
     window_minutes : int
         Size of sliding window (default 30 minutes)
     threshold_multiplier : float
@@ -103,6 +104,7 @@ def activity_bursts(records, window_minutes=30, threshold_multiplier=3):
     list of dict
         Each burst: {'start': datetime, 'end': datetime, 'count': int}
     """
+    records = user.records
     if len(records) < 2:
         return []
 
@@ -145,8 +147,7 @@ def activity_bursts(records, window_minutes=30, threshold_multiplier=3):
     return bursts
 
 
-@grouping
-def contact_first_appearance(records):
+def contact_first_appearance(user):
     """
     Identify when each contact first appears in the record.
 
@@ -154,11 +155,16 @@ def contact_first_appearance(records):
     -------------------
     New contacts shortly before an event may be significant.
 
+    Parameters
+    ----------
+    user : bandicoot.core.User
+
     Returns
     -------
     dict
         correspondent_id -> first_contact_datetime
     """
+    records = user.records
     if len(records) == 0:
         return {}
 
@@ -170,8 +176,7 @@ def contact_first_appearance(records):
     return first_seen
 
 
-@grouping
-def contact_last_appearance(records):
+def contact_last_appearance(user):
     """
     Identify when each contact last appears in the record.
 
@@ -179,11 +184,16 @@ def contact_last_appearance(records):
     -------------------
     Sudden cessation of contact may indicate fallout, threat, or victim.
 
+    Parameters
+    ----------
+    user : bandicoot.core.User
+
     Returns
     -------
     dict
         correspondent_id -> last_contact_datetime
     """
+    records = user.records
     if len(records) == 0:
         return {}
 
@@ -195,8 +205,7 @@ def contact_last_appearance(records):
     return last_seen
 
 
-@grouping
-def daily_activity_counts(records):
+def daily_activity_counts(user):
     """
     Count of interactions per day.
 
@@ -204,11 +213,16 @@ def daily_activity_counts(records):
     -------------------
     Identify unusually active or inactive days.
 
+    Parameters
+    ----------
+    user : bandicoot.core.User
+
     Returns
     -------
     dict
         date -> count
     """
+    records = user.records
     if len(records) == 0:
         return {}
 

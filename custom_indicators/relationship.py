@@ -11,13 +11,10 @@ Investigative Value
 - Understand communication dynamics between specific pairs
 """
 
-from bandicoot.helper.group import grouping
-from bandicoot.helper.maths import summary_stats
 from collections import Counter, defaultdict
 
 
-@grouping
-def relationship_strength(records):
+def relationship_strength(user):
     """
     Rank contacts by communication intensity.
 
@@ -29,11 +26,16 @@ def relationship_strength(records):
     Quickly identify who the subject communicates with most - these are
     potential witnesses, accomplices, or persons of interest.
 
+    Parameters
+    ----------
+    user : bandicoot.core.User
+
     Returns
     -------
     dict
         correspondent_id -> strength_score, sorted by score descending
     """
+    records = user.records
     if len(records) == 0:
         return {}
 
@@ -62,8 +64,7 @@ def relationship_strength(records):
     return dict(sorted(scores.items(), key=lambda x: x[1], reverse=True))
 
 
-@grouping
-def reciprocity_score(records):
+def reciprocity_score(user):
     """
     Measure balance of in/out communication per contact.
 
@@ -76,11 +77,16 @@ def reciprocity_score(records):
     One-sided relationships may indicate pursuit, harassment, or
     hierarchical relationship (e.g., receiving orders).
 
+    Parameters
+    ----------
+    user : bandicoot.core.User
+
     Returns
     -------
     dict
         correspondent_id -> reciprocity score (0.0 to 1.0)
     """
+    records = user.records
     if len(records) == 0:
         return {}
 
@@ -103,8 +109,7 @@ def reciprocity_score(records):
     return scores
 
 
-@grouping
-def initiation_ratio(records):
+def initiation_ratio(user):
     """
     Track who initiates contact in each relationship.
 
@@ -113,11 +118,16 @@ def initiation_ratio(records):
     The person who always initiates may be the pursuer, coordinator,
     or dependent party in the relationship.
 
+    Parameters
+    ----------
+    user : bandicoot.core.User
+
     Returns
     -------
     dict
         correspondent_id -> ratio of subject-initiated interactions (0.0 to 1.0)
     """
+    records = user.records
     if len(records) == 0:
         return {}
 
@@ -134,8 +144,7 @@ def initiation_ratio(records):
     }
 
 
-@grouping(user_kwd=True)
-def first_contact_of_day(records, user):
+def first_contact_of_day(user):
     """
     Identify who the subject contacts first each day.
 
@@ -144,11 +153,16 @@ def first_contact_of_day(records, user):
     First contact of day often reveals closest personal relationships
     (partner, family) or urgent business contacts.
 
+    Parameters
+    ----------
+    user : bandicoot.core.User
+
     Returns
     -------
     dict
         correspondent_id -> count of days they were first contact
     """
+    records = user.records
     if len(records) == 0:
         return {}
 
@@ -167,8 +181,7 @@ def first_contact_of_day(records, user):
     return dict(Counter(first_contacts))
 
 
-@grouping(user_kwd=True)
-def last_contact_of_day(records, user):
+def last_contact_of_day(user):
     """
     Identify who the subject contacts last each day.
 
@@ -177,11 +190,16 @@ def last_contact_of_day(records, user):
     Last contact of day often indicates close personal relationships
     or late-night coordination.
 
+    Parameters
+    ----------
+    user : bandicoot.core.User
+
     Returns
     -------
     dict
         correspondent_id -> count of days they were last contact
     """
+    records = user.records
     if len(records) == 0:
         return {}
 
@@ -200,10 +218,13 @@ def last_contact_of_day(records, user):
     return dict(Counter(last_contacts))
 
 
-@grouping
-def contact_interaction_summary(records):
+def contact_interaction_summary(user):
     """
     Detailed summary of interactions with each contact.
+
+    Parameters
+    ----------
+    user : bandicoot.core.User
 
     Returns
     -------
@@ -217,6 +238,7 @@ def contact_interaction_summary(records):
             'last_contact': datetime
         }
     """
+    records = user.records
     if len(records) == 0:
         return {}
 

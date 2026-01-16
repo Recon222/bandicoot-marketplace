@@ -18,14 +18,17 @@ from collections import Counter, defaultdict
 from datetime import timedelta
 
 
-@spatial_grouping(user_kwd=True)
-def location_timeline(positions, user):
+def location_timeline(user):
     """
     Chronological list of locations with timestamps.
 
     Investigative Value
     -------------------
     Reconstruct movement for alibi verification and proximity analysis.
+
+    Parameters
+    ----------
+    user : bandicoot.core.User
 
     Returns
     -------
@@ -34,8 +37,6 @@ def location_timeline(positions, user):
     """
     timeline = []
 
-    # Need to access original records for timestamps
-    # positions from spatial_grouping are binned, so we use user.records
     for r in sorted(user.records, key=lambda r: r.datetime):
         if r.position.antenna is None:
             continue
@@ -55,10 +56,9 @@ def location_timeline(positions, user):
     return timeline
 
 
-@spatial_grouping(user_kwd=True)
-def frequent_locations_ranked(positions, user, top_n=10):
+def frequent_locations_ranked(user, top_n=10):
     """
-    Rank locations by time spent (using 30-min binned positions).
+    Rank locations by visit frequency.
 
     Investigative Value
     -------------------
@@ -66,6 +66,7 @@ def frequent_locations_ranked(positions, user, top_n=10):
 
     Parameters
     ----------
+    user : bandicoot.core.User
     top_n : int
         Number of top locations to return
 
@@ -75,10 +76,11 @@ def frequent_locations_ranked(positions, user, top_n=10):
         Each entry: {'antenna_id': id, 'coordinates': (lat, lon),
                      'count': int, 'percentage': float}
     """
-    if len(positions) == 0:
+    records = [r for r in user.records if r.position.antenna]
+    if not records:
         return []
 
-    location_counts = Counter(str(p.antenna) for p in positions if p.antenna)
+    location_counts = Counter(r.position.antenna for r in records)
     total = sum(location_counts.values())
 
     results = []
@@ -141,14 +143,17 @@ def unusual_locations(positions, user, threshold_visits=2):
     return unusual
 
 
-@spatial_grouping(user_kwd=True)
-def location_transitions(positions, user):
+def location_transitions(user):
     """
     Detect movement between different antennas.
 
     Investigative Value
     -------------------
     Identify travel patterns and movement between locations.
+
+    Parameters
+    ----------
+    user : bandicoot.core.User
 
     Returns
     -------
@@ -187,28 +192,32 @@ def location_transitions(positions, user):
     return transitions
 
 
-@spatial_grouping(user_kwd=True)
-def time_at_locations(positions, user):
+def time_at_locations(user):
     """
-    Estimate time spent at each location based on binned positions.
+    Estimate time spent at each location based on record counts.
 
     Investigative Value
     -------------------
     Quantify how much time was spent at each location.
 
+    Parameters
+    ----------
+    user : bandicoot.core.User
+
     Returns
     -------
     dict
-        antenna_id -> estimated_hours (based on 30-min bins)
+        antenna_id -> estimated_hours (rough estimate: each record ~30 min)
     """
-    if len(positions) == 0:
+    records = [r for r in user.records if r.position.antenna]
+    if not records:
         return {}
 
-    # Each position represents a 30-minute bin
-    location_counts = Counter(str(p.antenna) for p in positions if p.antenna)
+    # Simple estimation: count records at each location
+    # Rough estimate: each record represents ~30 min window
+    location_counts = Counter(r.position.antenna for r in records)
 
-    # Convert to hours (each bin = 0.5 hours)
-    return {antenna: count * 0.5 for antenna, count in location_counts.items()}
+    return {str(antenna): count * 0.5 for antenna, count in location_counts.items()}
 
 
 def location_at_specific_time(user, target_datetime, window_minutes=30):
