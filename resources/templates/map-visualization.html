@@ -3282,10 +3282,13 @@
           console.log('[TimeController] Data loaded with time range:', timeRange);
           State.set('time.start', timeRange.start);
           State.set('time.end', timeRange.end);
-          State.set('time.current', timeRange.start);
-          this.updateClock(timeRange.start);
-          TimeSlider.updatePosition(timeRange.start);
+          // Set current time to END of range so all data is visible initially
+          State.set('time.current', timeRange.end);
+          this.updateClock(timeRange.end);
+          TimeSlider.updatePosition(timeRange.end);
           TimeSlider.updateLabels(timeRange.start, timeRange.end);
+          // Emit filter update to apply the new time filter
+          EventBus.emit('filter:update');
         });
 
         // Play/Pause button
@@ -4509,17 +4512,11 @@
       }
     }
 
-    // Start the application when DOM is ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initializeApp);
-    } else {
-      initializeApp();
-    }
-
     // ============================================================
     // DATA: Embedded GeoJSON
     // This will be populated by the Python generation script
     // or with sample data for testing
+    // IMPORTANT: This must run BEFORE initializeApp() is called
     // ============================================================
     window.BANDICOOT_DATA = null; // Will be set to {{GEOJSON_DATA}} by generator
 
@@ -4527,6 +4524,7 @@
     // SAMPLE DATA: For demonstration purposes
     // Generate sample CDR events if no data is provided
     // Creates realistic patterns: work hours, frequent contacts, clustered locations
+    // IMPORTANT: This must run BEFORE initializeApp() is called
     // ============================================================
     (function() {
       // Only generate sample data if BANDICOOT_DATA is null
@@ -4647,6 +4645,14 @@
 
       console.log('[SampleData] Generated', features.length, 'enhanced sample events');
     })();
+
+    // Start the application when DOM is ready
+    // IMPORTANT: This must run AFTER sample data generation
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeApp);
+    } else {
+      initializeApp();
+    }
 
   </script>
 </body>
