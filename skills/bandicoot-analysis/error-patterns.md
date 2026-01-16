@@ -2,6 +2,10 @@
 
 This document defines standard error handling patterns for all commands and skills.
 
+**Note on code examples**: The patterns below demonstrate error handling
+approaches and diagnostic techniques. Use them inline to diagnose issues -
+do not create wrapper scripts that add error handling around Bandicoot calls.
+
 ## Error Types and Recovery
 
 ### 1. File Not Found Errors
