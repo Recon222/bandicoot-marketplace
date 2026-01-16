@@ -708,26 +708,18 @@
 
     @keyframes digitFlip {
       0% {
-        transform: translateY(-50%);
-        opacity: 0;
+        transform: translateY(-30%);
       }
       50% {
-        transform: translateY(5%);
+        transform: translateY(3%);
       }
       100% {
         transform: translateY(0);
-        opacity: 1;
       }
     }
 
     .world-clock__colon {
       color: var(--text-muted);
-      animation: colonBlink 1s step-end infinite;
-    }
-
-    @keyframes colonBlink {
-      0%, 100% { opacity: 0.6; }
-      50% { opacity: 0.2; }
     }
 
     .world-clock__seconds {
@@ -3686,9 +3678,13 @@
         if (!el) return;
 
         if (el.textContent !== value) {
-          el.classList.add('world-clock__digit--flip');
           el.textContent = value;
-          setTimeout(() => el.classList.remove('world-clock__digit--flip'), 200);
+          // Only animate at normal speeds (1x or slower) to prevent visibility issues
+          const speed = State.get('time.speed');
+          if (speed <= 1) {
+            el.classList.add('world-clock__digit--flip');
+            setTimeout(() => el.classList.remove('world-clock__digit--flip'), 200);
+          }
         }
       }
     };
