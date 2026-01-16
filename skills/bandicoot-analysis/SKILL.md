@@ -68,6 +68,32 @@ conda run -n bandicoot python -c "import bandicoot as bc; print(f'Bandicoot {bc.
 python -c "import bandicoot as bc; print(f'Bandicoot {bc.__version__}')"
 ```
 
+## CRITICAL: Direct Function Calls, Not Wrapper Scripts
+
+Bandicoot is a complete analysis toolkit. The code examples in this skill
+documentation demonstrate Bandicoot's API - they should be executed DIRECTLY
+using inline Python commands, not saved as separate script files.
+
+**CORRECT approach** - Execute inline:
+```bash
+conda run -n bandicoot python -c "
+import bandicoot as bc
+user = bc.read_csv('ego', 'demo/data/', 'demo/data/antennas.csv')
+print(bc.individual.number_of_contacts(user, groupby=None))
+"
+```
+
+**INCORRECT approach** - Do NOT create wrapper scripts:
+```python
+# DON'T create a file like "analyze_contacts.py" containing:
+import bandicoot as bc
+def analyze_contacts(user_id, path):
+    user = bc.read_csv(user_id, path)
+    return bc.individual.number_of_contacts(user)
+```
+
+All Bandicoot functions shown below are built-in. Call them directly.
+
 ## Core Commands Reference
 
 ### Loading Data
@@ -482,9 +508,9 @@ print(f"Ignored records: {user.ignored_records}")
 user.describe()
 ```
 
-### Validation Script
+### Validation Script (Execute Inline)
 
-Run this to validate data before full analysis:
+Run this validation inline to check data before full analysis:
 
 ```python
 import bandicoot as bc
