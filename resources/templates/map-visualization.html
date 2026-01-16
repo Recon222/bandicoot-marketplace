@@ -2545,6 +2545,19 @@
         EventBus.emit('map:ready', { map: this.map });
 
         console.log('[MapController] Map loaded successfully');
+
+        // Check if data was already loaded before map was ready (race condition fix)
+        // This handles the case where user enters token after data was processed
+        if (window.BANDICOOT_DATA && window.BANDICOOT_DATA.features && window.BANDICOOT_DATA.features.length > 0) {
+          console.log('[MapController] Found existing data, loading', window.BANDICOOT_DATA.features.length, 'features');
+          this.loadData(window.BANDICOOT_DATA);
+
+          // Re-emit data:loaded for any controllers that need it
+          const processedData = DataLoader.process(window.BANDICOOT_DATA);
+          if (processedData) {
+            EventBus.emit('data:loaded', processedData);
+          }
+        }
       },
 
       /**
