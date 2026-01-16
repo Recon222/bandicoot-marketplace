@@ -2472,6 +2472,7 @@
       popup: null,
       _isStyleLoading: false,
       _pendingOperations: [],
+      _allFeatures: null,  // Stores unfiltered features for source-level filtering
 
       /**
        * Initialize the map
@@ -2728,15 +2729,35 @@
        * Reapply custom data layers after style change
        */
       _reapplyLayers() {
-        const features = State.get('data.features');
-        if (features && features.length > 0) {
-          const geojson = { type: 'FeatureCollection', features };
-          if (this.map.getSource('events')) {
-            this.map.getSource('events').setData(geojson);
-          } else {
-            this._addDataLayers(geojson);
-          }
+        // Check if we have stored features
+        if (!this._allFeatures || this._allFeatures.length === 0) {
+          console.warn('[MapController] No features to reapply');
+          return;
         }
+
+        // Get currently filtered features from source if it exists
+        const currentSource = this.map.getSource('events');
+        let currentData = null;
+
+        if (currentSource && currentSource._data) {
+          currentData = currentSource._data;
+        }
+
+        // If we have current filtered data, use it; otherwise use all features
+        const geojson = currentData || {
+          type: 'FeatureCollection',
+          features: this._allFeatures
+        };
+
+        // Reapply layers
+        if (this.map.getSource('events')) {
+          this.map.getSource('events').setData(geojson);
+        } else {
+          this._addDataLayers(geojson);
+        }
+
+        // Reapply current filters
+        this.updateFilters();
       },
 
       /**
@@ -2767,6 +2788,9 @@
           this._pendingOperations.push(() => this.loadData(geojson));
           return;
         }
+
+        // Store original unfiltered features for source-level filtering
+        this._allFeatures = geojson.features.slice();
 
         console.log('[MapController] Loading data:', geojson.features.length, 'features');
 
@@ -3215,12 +3239,22 @@
 
       /**
        * Update map filters based on current state
+       * Filters features in JS and updates source data (not layer filters)
+       * This ensures clusters update correctly
        */
       updateFilters() {
-        if (!this.map || !this.map.getSource('events')) return;
+        if (!this.map || !this.map.getSource('events')) {
+          console.warn('[MapController] Cannot update filters - map or source not ready');
+          return;
+        }
 
         if (this._isStyleLoading) {
           this._pendingOperations.push(() => this.updateFilters());
+          return;
+        }
+
+        if (!this._allFeatures) {
+          console.warn('[MapController] No features to filter');
           return;
         }
 
@@ -3228,27 +3262,60 @@
         const selectedContacts = State.get('contacts.selected');
         const contactMode = State.get('contacts.mode');
 
-        // Build filter expression
-        let filter = ['all'];
+        console.log('[MapController] Applying filters:', {
+          currentTime,
+          contactCount: selectedContacts.length,
+          contactMode,
+          totalFeatures: this._allFeatures.length
+        });
 
-        // Time filter: show events up to current time
-        if (currentTime !== null) {
-          filter.push(['<=', ['get', 'timestamp'], currentTime]);
+        // Filter features in JavaScript
+        let filteredFeatures = this._allFeatures;
+
+        // Apply time filter
+        if (typeof currentTime === 'number' && !isNaN(currentTime)) {
+          filteredFeatures = filteredFeatures.filter(feature => {
+            const timestamp = feature.properties?.timestamp;
+            return timestamp != null && timestamp <= currentTime;
+          });
         }
 
-        // Contact filter: show only selected contacts
-        if (contactMode !== 'all' && selectedContacts.length > 0) {
-          filter.push(['in', ['get', 'correspondent_id'], ['literal', selectedContacts]]);
-        } else if (contactMode === 'none' || (contactMode !== 'all' && selectedContacts.length === 0)) {
-          // Hide all if none selected
-          filter.push(['==', 1, 0]); // Always false
+        // Apply contact filter
+        if (contactMode === 'none' || (contactMode !== 'all' && selectedContacts.length === 0)) {
+          // Hide all contacts
+          filteredFeatures = [];
+        } else if (contactMode !== 'all' && selectedContacts.length > 0) {
+          // Show only selected contacts
+          filteredFeatures = filteredFeatures.filter(feature => {
+            const contactId = feature.properties?.correspondent_id;
+            return contactId != null && selectedContacts.includes(contactId);
+          });
+        }
+        // If contactMode === 'all', show all (no filtering needed)
+
+        console.log('[MapController] Filtered:', filteredFeatures.length, 'features');
+
+        // Update source data with filtered features
+        // This triggers re-clustering automatically
+        const source = this.map.getSource('events');
+        if (source) {
+          source.setData({
+            type: 'FeatureCollection',
+            features: filteredFeatures
+          });
         }
 
-        // Apply filter to unclustered points
-        const pointFilter = filter.length > 1 ? filter : ['!', ['has', 'point_count']];
-        this.map.setFilter('unclustered-point', ['all', ['!', ['has', 'point_count']], ...filter.slice(1)]);
-
-        console.log('[MapController] Filters updated');
+        // Remove any layer filters since we're filtering at source level
+        // Clusters and points now only show filtered data
+        if (this.map.getLayer('unclustered-point')) {
+          this.map.setFilter('unclustered-point', ['!', ['has', 'point_count']]);
+        }
+        if (this.map.getLayer('clusters')) {
+          this.map.setFilter('clusters', ['has', 'point_count']);
+        }
+        if (this.map.getLayer('cluster-count')) {
+          this.map.setFilter('cluster-count', ['has', 'point_count']);
+        }
       },
 
       /**
