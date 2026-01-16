@@ -2946,6 +2946,19 @@
 
         // Point click: show popup
         this.map.on('click', 'unclustered-point', (e) => this._handlePointClick(e));
+
+        // Map click: close popup when clicking empty areas
+        // This handler runs after layer handlers; queryRenderedFeatures checks if we hit a feature
+        this.map.on('click', (e) => {
+          const features = this.map.queryRenderedFeatures(e.point, {
+            layers: ['clusters', 'unclustered-point']
+          });
+          if (features.length === 0 && this.popup) {
+            this.popup.remove();
+            this.popup = null;
+            this._activePopupKey = null;
+          }
+        });
       },
 
       /**
@@ -3105,7 +3118,7 @@
           // Create and show popup
           this.popup = new mapboxgl.Popup({
             closeButton: false,
-            closeOnClick: true,
+            closeOnClick: false,
             maxWidth: '280px',
             className: 'bandicoot-popup'
           })
@@ -3251,7 +3264,7 @@
         // Create and show new popup with offset and smart anchor
         this.popup = new mapboxgl.Popup({
           closeButton: false,
-          closeOnClick: true,
+          closeOnClick: false,
           maxWidth: CONFIG.POPUP_MAX_WIDTH,
           className: 'bandicoot-popup',
           offset: 15,
