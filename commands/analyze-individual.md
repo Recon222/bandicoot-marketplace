@@ -37,6 +37,9 @@ Compute individual communication behavior indicators from phone records.
 
 ## Execution
 
+Execute the following Python code inline using `conda run -n bandicoot python -c "..."`.
+Do not save this as a separate script file.
+
 ```python
 import bandicoot as bc
 
