@@ -21,9 +21,12 @@ Run all Bandicoot indicators on user phone records and export results.
 
 ## Execution
 
-### Step 1: Run Complete Analysis
+Execute the following Python code inline using `conda run -n bandicoot python -c "..."`.
 
-Execute the following Python code with the provided arguments:
+**Note**: This code demonstrates the analysis workflow. Execute it inline
+or via the REPL - do not save it as a separate script file.
+
+### Step 1: Run Complete Analysis
 
 ```python
 import bandicoot as bc
