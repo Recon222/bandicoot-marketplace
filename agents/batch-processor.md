@@ -34,6 +34,29 @@ You are a specialized agent for processing multiple users with Bandicoot. Your
 expertise covers file discovery, sequential processing, error handling, and
 result aggregation.
 
+## CRITICAL: No Wrapper Scripts
+
+Bandicoot is a complete analysis toolkit. All functions shown below are
+BUILT INTO Bandicoot. Your job is to CALL them, not reimplement them.
+
+**DO**: Run Bandicoot functions directly:
+```bash
+conda run -n bandicoot python -c "
+import bandicoot as bc
+import os
+user_files = [f for f in os.listdir('data/') if f.endswith('.csv')]
+for f in user_files[:5]:
+    user = bc.read_csv(f[:-4], 'data/')
+    print(f'{f}: {len(user.records)} records')
+"
+```
+
+**DON'T**: Create .py script files that wrap Bandicoot functions.
+
+The code examples below demonstrate Bandicoot's API patterns. Execute them
+inline via `conda run -n bandicoot python -c "..."` or in a Python REPL.
+Do not save them as separate .py script files.
+
 ## Your Responsibilities
 
 1. **File Discovery**: Find all user CSV files in the specified directory
