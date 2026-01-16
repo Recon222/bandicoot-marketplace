@@ -1412,6 +1412,167 @@
     }
 
     /* ============================================================
+       SECTION: Event Popup Component
+       Rich popup for individual CDR events
+       Could be extracted to: css/components/event-popup.css
+       ============================================================ */
+    .event-popup {
+      min-width: 220px;
+      max-width: 280px;
+    }
+
+    .event-popup__header {
+      padding: var(--space-3) var(--space-4);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .event-popup__icon {
+      width: 32px;
+      height: 32px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .event-popup__icon--call-in {
+      background: rgba(16, 185, 129, 0.2);
+      color: var(--color-call-in);
+    }
+
+    .event-popup__icon--call-out {
+      background: rgba(59, 130, 246, 0.2);
+      color: var(--color-call-out);
+    }
+
+    .event-popup__icon--text-in {
+      background: rgba(245, 158, 11, 0.2);
+      color: var(--color-text-in);
+    }
+
+    .event-popup__icon--text-out {
+      background: rgba(236, 72, 153, 0.2);
+      color: var(--color-text-out);
+    }
+
+    .event-popup__type {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .event-popup__body {
+      padding: var(--space-3) var(--space-4);
+    }
+
+    .event-popup__row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-2) 0;
+    }
+
+    .event-popup__row:not(:last-child) {
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .event-popup__label {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .event-popup__value {
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+    }
+
+    /* ============================================================
+       SECTION: Cluster Popup Component
+       Summary popup for clustered event groups
+       Could be extracted to: css/components/cluster-popup.css
+       ============================================================ */
+    .cluster-popup {
+      min-width: 240px;
+    }
+
+    .cluster-popup__header {
+      padding: var(--space-4);
+      text-align: center;
+      border-bottom: 1px solid var(--glass-border);
+    }
+
+    .cluster-popup__count {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+    }
+
+    .cluster-popup__label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-top: var(--space-1);
+    }
+
+    .cluster-popup__breakdown {
+      padding: var(--space-4);
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+    }
+
+    .cluster-popup__stat {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .cluster-popup__stat-color {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .cluster-popup__stat-value {
+      font-size: 13px;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+    }
+
+    .cluster-popup__stat-type {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .cluster-popup__action {
+      display: block;
+      width: 100%;
+      padding: var(--space-3);
+      background: var(--accent-primary);
+      border: none;
+      border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+      color: var(--bg-primary);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      cursor: pointer;
+      transition: background var(--transition-fast);
+    }
+
+    .cluster-popup__action:hover {
+      background: var(--accent-secondary);
+    }
+
+    /* ============================================================
        SECTION: Responsive Breakpoints
        Mobile-first responsive adjustments
        Could be extracted to: css/responsive.css
@@ -2345,20 +2506,28 @@
       },
 
       /**
-       * Handle cluster click - zoom to expand
+       * Handle cluster click - zoom to expand or show popup on Shift+click
        * @param {Object} e - Map click event
        */
       _handleClusterClick(e) {
         const features = this.map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
         if (!features.length) return;
 
-        const clusterId = features[0].properties.cluster_id;
+        const cluster = features[0];
+        const clusterId = cluster.properties.cluster_id;
         const source = this.map.getSource('events');
 
+        // Shift+click shows popup instead of zooming
+        if (e.originalEvent.shiftKey) {
+          this._showClusterPopup(cluster, source);
+          return;
+        }
+
+        // Normal click: zoom to expand
         source.getClusterExpansionZoom(clusterId, (err, zoom) => {
           if (err) return;
           this.map.easeTo({
-            center: features[0].geometry.coordinates,
+            center: cluster.geometry.coordinates,
             zoom: zoom + 1,
             duration: 500
           });
@@ -2366,17 +2535,135 @@
       },
 
       /**
-       * Handle individual point click - show popup
-       * (Popup content will be enhanced in Phase 7)
+       * Show cluster summary popup with event breakdown
+       * @param {Object} cluster - Cluster feature
+       * @param {Object} source - Map source
+       */
+      _showClusterPopup(cluster, source) {
+        const count = cluster.properties.point_count;
+        const coords = cluster.geometry.coordinates;
+        const clusterId = cluster.properties.cluster_id;
+
+        // Get cluster leaves to calculate breakdown
+        source.getClusterLeaves(clusterId, 100, 0, (err, leaves) => {
+          if (err) {
+            console.error('[MapController] Error getting cluster leaves:', err);
+            return;
+          }
+
+          // Calculate breakdown by type and direction
+          const stats = {
+            callIn: 0,
+            callOut: 0,
+            textIn: 0,
+            textOut: 0
+          };
+
+          leaves.forEach(leaf => {
+            const props = leaf.properties;
+            const type = props.interaction_type;
+            const dir = props.direction;
+            if (type === 'call' && dir === 'in') stats.callIn++;
+            else if (type === 'call' && dir === 'out') stats.callOut++;
+            else if (type === 'text' && dir === 'in') stats.textIn++;
+            else if (type === 'text' && dir === 'out') stats.textOut++;
+          });
+
+          // Build cluster popup HTML
+          const html = `
+            <div class="cluster-popup glass-panel">
+              <div class="cluster-popup__header">
+                <div class="cluster-popup__count">${count}</div>
+                <div class="cluster-popup__label">Events in this area</div>
+              </div>
+              <div class="cluster-popup__breakdown">
+                <div class="cluster-popup__stat">
+                  <div class="cluster-popup__stat-color" style="background: var(--color-call-in);"></div>
+                  <span class="cluster-popup__stat-value">${stats.callIn}</span>
+                  <span class="cluster-popup__stat-type">Calls In</span>
+                </div>
+                <div class="cluster-popup__stat">
+                  <div class="cluster-popup__stat-color" style="background: var(--color-call-out);"></div>
+                  <span class="cluster-popup__stat-value">${stats.callOut}</span>
+                  <span class="cluster-popup__stat-type">Calls Out</span>
+                </div>
+                <div class="cluster-popup__stat">
+                  <div class="cluster-popup__stat-color" style="background: var(--color-text-in);"></div>
+                  <span class="cluster-popup__stat-value">${stats.textIn}</span>
+                  <span class="cluster-popup__stat-type">Texts In</span>
+                </div>
+                <div class="cluster-popup__stat">
+                  <div class="cluster-popup__stat-color" style="background: var(--color-text-out);"></div>
+                  <span class="cluster-popup__stat-value">${stats.textOut}</span>
+                  <span class="cluster-popup__stat-type">Texts Out</span>
+                </div>
+              </div>
+              <button class="cluster-popup__action" onclick="MapController._zoomToCluster('${clusterId}')">
+                Zoom In
+              </button>
+            </div>
+          `;
+
+          // Remove existing popup
+          if (this.popup) {
+            this.popup.remove();
+          }
+
+          // Create and show popup
+          this.popup = new mapboxgl.Popup({
+            closeButton: false,
+            closeOnClick: true,
+            maxWidth: '280px',
+            className: 'bandicoot-popup'
+          })
+            .setLngLat(coords)
+            .setHTML(html)
+            .addTo(this.map);
+        });
+      },
+
+      /**
+       * Zoom to cluster (called from popup button)
+       * @param {string} clusterId - Cluster ID
+       */
+      _zoomToCluster(clusterId) {
+        const source = this.map.getSource('events');
+        if (!source) return;
+
+        source.getClusterExpansionZoom(parseInt(clusterId), (err, zoom) => {
+          if (err) return;
+
+          // Get cluster coordinates from rendered features
+          const clusters = this.map.queryRenderedFeatures({ layers: ['clusters'] });
+          const cluster = clusters.find(c => c.properties.cluster_id === parseInt(clusterId));
+
+          if (cluster) {
+            // Close popup first
+            if (this.popup) {
+              this.popup.remove();
+            }
+
+            this.map.easeTo({
+              center: cluster.geometry.coordinates,
+              zoom: zoom + 1,
+              duration: 500
+            });
+          }
+        });
+      },
+
+      /**
+       * Handle individual point click - show rich event popup
        * @param {Object} e - Map click event
        */
       _handlePointClick(e) {
         const feature = e.features[0];
         const props = feature.properties;
 
-        // Create popup content (basic for now, enhanced in Phase 7)
+        // Determine event type and direction
         const type = props.interaction_type;
         const dir = props.direction;
+        const iconClass = `event-popup__icon--${type}-${dir}`;
         const typeLabel = `${dir === 'in' ? 'Incoming' : 'Outgoing'} ${type === 'call' ? 'Call' : 'Text'}`;
 
         // Format timestamp
@@ -2390,26 +2677,50 @@
         const timeStr = date.toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
+          second: '2-digit',
           hour12: false
         });
 
-        // Simple popup HTML (will be enhanced in Phase 7)
+        // Duration row for calls
+        const durationHtml = type === 'call' && props.duration ? `
+          <div class="event-popup__row">
+            <span class="event-popup__label">Duration</span>
+            <span class="event-popup__value">${this._formatDuration(props.duration)}</span>
+          </div>
+        ` : '';
+
+        // Build rich popup HTML
         const html = `
-          <div style="
-            font-family: var(--font-primary);
-            padding: 12px;
-            min-width: 200px;
-          ">
-            <div style="
-              font-weight: 600;
-              font-size: 14px;
-              color: var(--text-primary);
-              margin-bottom: 8px;
-            ">${typeLabel}</div>
-            <div style="font-size: 12px; color: var(--text-secondary);">
-              <div style="margin-bottom: 4px;">${dateStr}</div>
-              <div style="font-family: var(--font-mono);">${timeStr}</div>
-              ${props.correspondent_id ? `<div style="margin-top: 8px; color: var(--text-muted);">Contact: ${props.correspondent_id}</div>` : ''}
+          <div class="event-popup glass-panel">
+            <div class="event-popup__header">
+              <div class="event-popup__icon ${iconClass}">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  ${type === 'call'
+                    ? '<path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>'
+                    : '<path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>'
+                  }
+                </svg>
+              </div>
+              <div class="event-popup__type">${typeLabel}</div>
+            </div>
+            <div class="event-popup__body">
+              <div class="event-popup__row">
+                <span class="event-popup__label">Date</span>
+                <span class="event-popup__value">${dateStr}</span>
+              </div>
+              <div class="event-popup__row">
+                <span class="event-popup__label">Time</span>
+                <span class="event-popup__value">${timeStr}</span>
+              </div>
+              ${durationHtml}
+              <div class="event-popup__row">
+                <span class="event-popup__label">Contact</span>
+                <span class="event-popup__value">${props.correspondent_id || 'Unknown'}</span>
+              </div>
+              <div class="event-popup__row">
+                <span class="event-popup__label">Antenna</span>
+                <span class="event-popup__value">${props.antenna_id || 'Unknown'}</span>
+              </div>
             </div>
           </div>
         `;
@@ -2421,7 +2732,7 @@
 
         // Create and show new popup
         this.popup = new mapboxgl.Popup({
-          closeButton: true,
+          closeButton: false,
           closeOnClick: true,
           maxWidth: CONFIG.POPUP_MAX_WIDTH,
           className: 'bandicoot-popup'
@@ -2429,6 +2740,21 @@
           .setLngLat(feature.geometry.coordinates)
           .setHTML(html)
           .addTo(this.map);
+      },
+
+      /**
+       * Format duration in seconds to readable string
+       * @param {number} seconds - Duration in seconds
+       * @returns {string} Formatted duration (e.g., "5m 30s")
+       */
+      _formatDuration(seconds) {
+        if (!seconds || seconds < 0) return '0s';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        if (mins > 0) {
+          return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+        }
+        return `${secs}s`;
       },
 
       /**
