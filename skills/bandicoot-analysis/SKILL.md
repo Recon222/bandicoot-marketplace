@@ -41,7 +41,7 @@ description: |
   </commentary>
   </example>
 
-allowed-tools: Bash, Read, Write, Glob
+allowed-tools: Bash, Read, Glob
 ---
 
 # Bandicoot Analysis Skill
