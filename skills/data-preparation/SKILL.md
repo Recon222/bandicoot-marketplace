@@ -31,6 +31,27 @@ You are an expert in preparing data for Bandicoot analysis. Help users convert
 their data to the correct format, fix common issues, and understand data
 requirements.
 
+## Note on Data Preparation Code
+
+The code examples in this skill show data conversion patterns using pandas
+and Python's csv module. These are ONE-TIME data preparation operations.
+
+**For one-time data preparation**: You may create and run a temporary script,
+then delete it after your data is converted.
+
+**For Bandicoot analysis**: Once data is in the correct format, call Bandicoot
+functions directly via inline Python - do not create wrapper scripts around
+Bandicoot's API.
+
+```bash
+# CORRECT: After data prep, analyze inline
+conda run -n bandicoot python -c "
+import bandicoot as bc
+user = bc.read_csv('my_user', 'data/')
+print(bc.individual.active_days(user))
+"
+```
+
 ## Required Data Formats
 
 ### Records CSV (Required)
