@@ -2470,6 +2470,7 @@
     const MapController = {
       map: null,
       popup: null,
+      _activePopupKey: null,  // Tracks which feature's popup is open for toggle behavior
       _isStyleLoading: false,
       _pendingOperations: [],
       _allFeatures: null,  // Stores unfiltered features for source-level filtering
@@ -3016,6 +3017,7 @@
 
       /**
        * Show cluster summary popup with event breakdown
+       * Clicking the same cluster again toggles the popup closed
        * @param {Object} cluster - Cluster feature
        * @param {Object} source - Map source
        */
@@ -3023,6 +3025,17 @@
         const count = cluster.properties.point_count;
         const coords = cluster.geometry.coordinates;
         const clusterId = cluster.properties.cluster_id;
+
+        // Create unique key for this cluster
+        const clusterKey = `cluster_${clusterId}`;
+
+        // Toggle behavior: if clicking the same cluster, close the popup
+        if (this.popup && this._activePopupKey === clusterKey) {
+          this.popup.remove();
+          this.popup = null;
+          this._activePopupKey = null;
+          return;
+        }
 
         // Get cluster leaves to calculate breakdown
         source.getClusterLeaves(clusterId, 100, 0, (err, leaves) => {
@@ -3099,6 +3112,14 @@
             .setLngLat(coords)
             .setHTML(html)
             .addTo(this.map);
+
+          // Track which cluster's popup is open for toggle behavior
+          this._activePopupKey = clusterKey;
+
+          // Clear tracking when popup is closed by other means
+          this.popup.on('close', () => {
+            this._activePopupKey = null;
+          });
         });
       },
 
@@ -3134,11 +3155,24 @@
 
       /**
        * Handle individual point click - show rich event popup
+       * Clicking the same marker again toggles the popup closed
        * @param {Object} e - Map click event
        */
       _handlePointClick(e) {
         const feature = e.features[0];
         const props = feature.properties;
+        const coords = feature.geometry.coordinates;
+
+        // Create unique key for this feature based on coordinates
+        const featureKey = `point_${coords[0]}_${coords[1]}`;
+
+        // Toggle behavior: if clicking the same marker, close the popup
+        if (this.popup && this._activePopupKey === featureKey) {
+          this.popup.remove();
+          this.popup = null;
+          this._activePopupKey = null;
+          return;
+        }
 
         // Determine event type and direction
         const type = props.interaction_type;
@@ -3226,6 +3260,14 @@
           .setLngLat(feature.geometry.coordinates)
           .setHTML(html)
           .addTo(this.map);
+
+        // Track which feature's popup is open for toggle behavior
+        this._activePopupKey = featureKey;
+
+        // Clear tracking when popup is closed by other means (e.g., clicking elsewhere)
+        this.popup.on('close', () => {
+          this._activePopupKey = null;
+        });
       },
 
       /**
