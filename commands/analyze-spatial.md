@@ -15,216 +15,148 @@ Compute spatial mobility indicators from phone records with antenna location dat
 - `antennas_path` (required): Path to antennas CSV file with coordinates
 - `--groupby`: Aggregation level - `week` (default), `month`, `year`, or `none`
 
-## Spatial Indicators Computed
+## How to Run
 
-| Indicator | Description |
-|-----------|-------------|
-| `number_of_antennas` | Unique locations visited |
-| `entropy_of_antennas` | Diversity of places visited |
-| `percent_at_home` | Time spent at detected home |
-| `radius_of_gyration` | Typical mobility range (km) |
-| `frequent_antennas` | Locations for 80% of time |
-| `churn_rate` | Week-to-week location change |
-
-## Execution
-
-Execute the following Python code inline using `conda run -n bandicoot python -c "..."`.
-Do not save this as a separate script file.
-
-```python
-import bandicoot as bc
-
-# Load user with antenna data (required for spatial indicators)
-user = bc.read_csv(
-    '{user_id}',
-    '{records_path}',
-    '{antennas_path}',
-    describe=True,
-    warnings=True
-)
-
-groupby = '{groupby}' if '{groupby}' != 'none' else None
-
-# Check data availability
-print(f"\n=== Spatial Analysis Prerequisites ===")
-print(f"Records: {len(user.records)}")
-print(f"Antennas loaded: {len(user.antennas)}")
-print(f"Has home: {user.has_home}")
-
-if user.home:
-    print(f"Home location: {user.home}")
-
-# Calculate missing location percentage
-from bandicoot.helper.tools import percent_records_missing_location
-pct_missing = percent_records_missing_location(user)
-print(f"Records missing location: {pct_missing:.1%}")
-
-if pct_missing > 0.5:
-    print("WARNING: More than 50% of records missing location data")
-    print("Spatial indicators may be unreliable")
-
-print(f"\n{'=' * 50}")
-print(f"Spatial Indicators for {user.name}")
-print('=' * 50)
-
-# Location diversity
-print("\n--- Location Diversity ---")
-na = bc.spatial.number_of_antennas(user, groupby=groupby)
-print(f"Number of antennas (unique locations): {na}")
-
-ea = bc.spatial.entropy_of_antennas(user, groupby=groupby)
-print(f"Entropy of antennas: {ea}")
-
-ea_norm = bc.spatial.entropy_of_antennas(user, groupby=groupby, normalize=True)
-print(f"Entropy of antennas (normalized 0-1): {ea_norm}")
-
-# Home-based metrics
-print("\n--- Home-Based Metrics ---")
-if user.has_home:
-    pah = bc.spatial.percent_at_home(user, groupby=groupby)
-    print(f"Percent at home: {pah}")
-else:
-    print("Home not detected - percent_at_home unavailable")
-    print("Tip: Need nighttime records with location data to detect home")
-
-# Mobility range
-print("\n--- Mobility Range ---")
-rog = bc.spatial.radius_of_gyration(user, groupby=groupby)
-print(f"Radius of gyration: {rog}")
-
-# Frequent locations
-print("\n--- Frequent Locations ---")
-fa = bc.spatial.frequent_antennas(user, groupby=groupby)
-print(f"Frequent antennas (80% of time): {fa}")
-
-fa_90 = bc.spatial.frequent_antennas(user, groupby=groupby, percentage=0.9)
-print(f"Frequent antennas (90% of time): {fa_90}")
-
-# Location stability
-print("\n--- Location Stability ---")
-cr = bc.spatial.churn_rate(user)
-print(f"Churn rate (week-to-week change): {cr}")
-
-print(f"\n{'=' * 50}")
-print("Spatial analysis complete!")
-
-# Interpretation guide
-print("\n=== Interpretation Guide ===")
-print("- Radius of gyration: ~1-5km = local, ~10-50km = regional, >50km = traveler")
-print("- Percent at home: >0.5 = home-based, <0.3 = mobile lifestyle")
-print("- Frequent antennas: 2-3 typical (home + work + regular spots)")
-print("- Churn rate: 0 = same pattern every week, 1 = completely different")
+Execute commands using:
+```
+conda run -n bandicoot python -c "import bandicoot as bc; <commands>"
 ```
 
-## Examples
+Do NOT create script files. Run commands inline and read the output.
 
-### Basic Spatial Analysis
+## Spatial Indicator Commands
+
+All functions are in `bc.spatial` module:
+
+| Command | Returns |
+|---------|---------|
+| `bc.spatial.number_of_antennas(user)` | Unique locations visited |
+| `bc.spatial.entropy_of_antennas(user)` | Location diversity (Shannon entropy) |
+| `bc.spatial.entropy_of_antennas(user, normalize=True)` | Normalized entropy (0-1) |
+| `bc.spatial.percent_at_home(user)` | Time at detected home % |
+| `bc.spatial.radius_of_gyration(user)` | Mobility range in km |
+| `bc.spatial.frequent_antennas(user)` | Locations for 80% of time |
+| `bc.spatial.frequent_antennas(user, percentage=0.9)` | Locations for 90% of time |
+| `bc.spatial.churn_rate(user)` | Week-to-week location change |
+
+All accept `groupby` parameter: `bc.spatial.radius_of_gyration(user, groupby='week')`
+
+## Workflow
+
+### 1. Load User with Antennas
 
 ```
-/bandicoot:analyze-spatial ego demo/data/ demo/data/antennas.csv
+user = bc.read_csv('user_id', 'path/', 'antennas.csv')
 ```
 
-### Without Aggregation (Single Values)
+Antennas file is required for spatial indicators.
 
-```
-/bandicoot:analyze-spatial ego demo/data/ demo/data/antennas.csv --groupby=none
-```
+### 2. Check Data Quality
 
-### Monthly Aggregation
+- `len(user.antennas)` - antennas loaded
+- `user.has_home` - True if home detected
+- `user.home` - home antenna location
+- Check missing location percentage with helper function
 
-```
-/bandicoot:analyze-spatial ego demo/data/ demo/data/antennas.csv --groupby=month
-```
+### 3. Run Indicators
 
-## Indicator Details
-
-### number_of_antennas
-
-Count of unique antenna/tower locations where the user had interactions. Higher
-values indicate more mobility. Note: This measures antenna diversity, not
-geographic distance.
-
-### entropy_of_antennas
-
-Shannon entropy of location distribution. Measures how evenly time is spent
-across visited locations.
-
-- Low entropy (0-1): Concentrated in few locations
-- High entropy: Time spread evenly across many locations
-- Normalized version (0-1) allows comparison across users
-
-### percent_at_home
-
-Fraction of interactions occurring at the detected home location. Home is
-automatically detected as the most frequent nighttime (7pm-7am) location.
-
-- High (>0.5): Home-based lifestyle
-- Low (<0.3): Away from home frequently
-- None: Insufficient nighttime location data to detect home
-
-### radius_of_gyration
-
-The equivalent distance of mass from the center of gravity for all visited
-locations, measured in kilometers. This is the standard mobility range metric
-from human mobility studies.
-
-Typical values:
-- 1-5 km: Local mobility (within city neighborhood)
-- 5-20 km: Urban mobility (across city)
-- 20-50 km: Regional mobility (commuter)
-- 50+ km: Long-distance mobility (frequent traveler)
-
-### frequent_antennas
-
-Number of locations that account for a given percentage of time (default 80%).
-Most people have 2-3 frequent locations (home, work, and one or two regular
-spots).
-
-### churn_rate
-
-Measures week-to-week consistency of location patterns using cosine distance
-between weekly location frequency vectors.
-
-- 0: Identical location pattern every week
-- 0.3-0.5: Typical weekly variation
-- >0.7: High variability (changing locations)
-- 1.0: Completely different locations each week
+Run specific spatial indicators or use `bc.utils.all(user)` for all.
 
 ## Data Requirements
 
-Spatial indicators require:
-
-1. **Records with antenna_id**: Each record should have an `antenna_id` field
-2. **Antennas file**: CSV with `antenna_id`, `latitude`, `longitude` columns
-3. **Matching IDs**: The `antenna_id` values in records must match keys in
-   antennas file
+### Records CSV
+Must have `antenna_id` column linking to antennas file.
 
 ### Antennas CSV Format
-
 ```csv
 antenna_id,latitude,longitude
 tower_701,42.361013,-71.097868
 tower_702,42.370849,-71.114613
-tower_703,42.355800,-71.101200
+```
+
+## Interpretation Guide
+
+### number_of_antennas
+Unique antenna locations visited. Higher = more mobility.
+
+### entropy_of_antennas
+Shannon entropy of location distribution.
+
+| Value (normalized) | Interpretation |
+|--------------------|----------------|
+| 0 - 0.3 | Concentrated (few locations) |
+| 0.3 - 0.7 | Moderate diversity |
+| 0.7 - 1.0 | High diversity |
+
+### percent_at_home
+Fraction at detected home (nighttime mode location).
+
+| Value | Interpretation |
+|-------|----------------|
+| > 0.5 | Home-based lifestyle |
+| 0.3-0.5 | Balanced |
+| < 0.3 | Mobile lifestyle |
+| None | Home not detected |
+
+### radius_of_gyration
+Mobility range in kilometers (standard mobility metric).
+
+| Value | Interpretation |
+|-------|----------------|
+| 1-5 km | Local (neighborhood) |
+| 5-20 km | Urban (city-wide) |
+| 20-50 km | Regional (commuter) |
+| > 50 km | Long-distance traveler |
+
+### frequent_antennas
+Locations accounting for 80% of time. Most people: 2-3 (home + work + regular spots).
+
+### churn_rate
+Week-to-week location pattern change (cosine distance).
+
+| Value | Interpretation |
+|-------|----------------|
+| 0 | Identical weekly pattern |
+| 0.3-0.5 | Typical variation |
+| > 0.7 | High variability |
+| 1.0 | Completely different each week |
+
+## Examples
+
+Basic spatial analysis:
+```
+/bandicoot:analyze-spatial ego demo/data/ demo/data/antennas.csv
+```
+
+Single values (no aggregation):
+```
+/bandicoot:analyze-spatial ego demo/data/ demo/data/antennas.csv --groupby=none
+```
+
+Monthly aggregation:
+```
+/bandicoot:analyze-spatial ego demo/data/ demo/data/antennas.csv --groupby=month
 ```
 
 ## Troubleshooting
 
-### All Spatial Indicators are None
+**All spatial indicators are None**
+- Check antennas file path is correct
+- Verify antenna_id values match between records and antennas file
+- Run `/bandicoot:load` to see data quality warnings
 
-1. Check that antennas_path points to a valid file
-2. Verify antenna_id values match between records and antennas file
-3. Run `/bandicoot:load` first to see data quality warnings
-
-### Home Not Detected
-
+**Home not detected**
 Home detection requires:
-- Records during night hours (7pm-7am by default)
+- Records during night hours (7pm-7am)
 - Those records must have valid antenna_id
-- The antenna must have coordinates in the antennas file
+- Antenna must have coordinates in antennas file
 
-### Radius of Gyration is 0
-
-- Only one unique location in the data
-- All records have the same antenna_id
+**Radius of gyration is 0**
+- Only one unique location in data
+- All records have same antenna_id
 - Check for data quality issues
+
+**High missing location percentage**
+- Some records lack antenna_id
+- antenna_id values not found in antennas file
+- Spatial indicators may be unreliable if > 50% missing
