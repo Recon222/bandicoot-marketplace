@@ -1573,48 +1573,363 @@
     }
 
     /* ============================================================
+       SECTION: Popup Animations
+       Smooth entrance animations for map popups
+       ============================================================ */
+    .mapboxgl-popup {
+      animation: popupEnter 0.25s var(--ease-out-expo) forwards;
+    }
+
+    @keyframes popupEnter {
+      from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* ============================================================
+       SECTION: Event Legend
+       Color-coded legend for event types
+       Could be extracted to: css/components/legend.css
+       ============================================================ */
+    .event-legend {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-4);
+      margin-top: var(--space-3);
+      border-top: 1px solid var(--glass-border);
+    }
+
+    .event-legend__title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: var(--space-1);
+    }
+
+    .event-legend__grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-2);
+    }
+
+    .event-legend__item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .event-legend__color {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 6px currentColor;
+    }
+
+    .event-legend__color--call-in { background: var(--color-call-in); color: var(--color-call-in); }
+    .event-legend__color--call-out { background: var(--color-call-out); color: var(--color-call-out); }
+    .event-legend__color--text-in { background: var(--color-text-in); color: var(--color-text-in); }
+    .event-legend__color--text-out { background: var(--color-text-out); color: var(--color-text-out); }
+
+    .event-legend__label {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    /* ============================================================
+       SECTION: Focus States & Accessibility
+       Enhanced keyboard navigation support
+       ============================================================ */
+    *:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 2px;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    .glass-panel:focus-visible {
+      outline: 2px solid var(--accent-primary);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px var(--accent-glow);
+    }
+
+    /* Skip focus outline for mouse users */
+    button:focus:not(:focus-visible),
+    input:focus:not(:focus-visible) {
+      outline: none;
+    }
+
+    /* ============================================================
+       SECTION: Contact Filter Item Animation
+       Staggered entrance for contact list items
+       ============================================================ */
+    .contact-filter__item {
+      animation: contactItemEnter 0.3s var(--ease-out-expo) backwards;
+    }
+
+    @keyframes contactItemEnter {
+      from {
+        opacity: 0;
+        transform: translateX(-8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* ============================================================
+       SECTION: Stats Summary Badge
+       Event count badge for quick reference
+       ============================================================ */
+    .stats-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      background: var(--glass-bg);
+      backdrop-filter: blur(var(--glass-blur));
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-full);
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+    }
+
+    .stats-badge__count {
+      font-weight: 600;
+      color: var(--accent-primary);
+    }
+
+    .stats-badge__icon {
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted);
+    }
+
+    /* ============================================================
        SECTION: Responsive Breakpoints
        Mobile-first responsive adjustments
        Could be extracted to: css/responsive.css
        ============================================================ */
+    /* Large tablets and small desktops */
     @media (max-width: 1024px) {
       :root {
         --space-6: 20px;
       }
+
+      .contact-filter {
+        width: 260px;
+      }
+
+      .world-clock__time {
+        font-size: 32px;
+      }
+
+      .world-clock__digit {
+        width: 26px;
+      }
     }
 
+    /* Tablets */
     @media (max-width: 768px) {
       :root {
         --space-6: 16px;
       }
 
       .controls-top-left {
-        top: var(--space-4);
-        left: var(--space-4);
+        top: var(--space-3);
+        left: var(--space-3);
         max-height: calc(100vh - 180px);
       }
 
       .controls-top-right {
-        top: var(--space-4);
-        right: var(--space-4);
+        top: var(--space-3);
+        right: var(--space-3);
       }
 
       .controls-bottom {
-        left: var(--space-4);
-        right: var(--space-4);
-        bottom: var(--space-4);
+        left: var(--space-3);
+        right: var(--space-3);
+        bottom: var(--space-3);
+      }
+
+      .contact-filter {
+        width: 220px;
+      }
+
+      .contact-filter__list {
+        max-height: 180px;
+      }
+
+      .world-clock__time {
+        font-size: 26px;
+      }
+
+      .world-clock__digit {
+        width: 22px;
+      }
+
+      .time-controls__row {
+        flex-wrap: wrap;
+        gap: var(--space-2);
       }
 
       .datetime-picker__dropdown {
         left: auto;
         right: 0;
+        width: 300px;
+      }
+
+      .datetime-picker__presets {
+        gap: var(--space-1);
+      }
+
+      .datetime-picker__preset {
+        padding: var(--space-2) var(--space-2);
+        font-size: 11px;
+      }
+
+      .event-legend__grid {
+        gap: var(--space-1);
       }
     }
 
+    /* Small tablets and large phones */
+    @media (max-width: 600px) {
+      .controls-top-left {
+        width: 200px;
+      }
+
+      .contact-filter__header {
+        padding: var(--space-2) var(--space-3);
+      }
+
+      .contact-filter__search {
+        padding: var(--space-2) var(--space-3);
+      }
+
+      .world-clock {
+        padding: var(--space-3);
+      }
+
+      .time-controls {
+        padding: var(--space-3);
+      }
+
+      .time-controls__playback {
+        gap: var(--space-2);
+      }
+
+      .time-controls__btn {
+        width: 36px;
+        height: 36px;
+      }
+
+      .time-controls__btn--play {
+        width: 44px;
+        height: 44px;
+      }
+    }
+
+    /* Phones */
     @media (max-width: 480px) {
-      .controls-top-left,
+      .controls-top-left {
+        position: fixed;
+        top: var(--space-2);
+        left: var(--space-2);
+        width: 180px;
+        max-height: 50vh;
+      }
+
       .controls-top-right {
-        position: static;
+        position: fixed;
+        top: var(--space-2);
+        right: var(--space-2);
+      }
+
+      .controls-bottom {
+        left: var(--space-2);
+        right: var(--space-2);
+        bottom: var(--space-2);
+      }
+
+      .world-clock__time {
+        font-size: 22px;
+      }
+
+      .world-clock__digit {
+        width: 18px;
+      }
+
+      .time-slider__track {
+        height: 6px;
+      }
+
+      .time-slider__handle {
+        width: 14px;
+        height: 14px;
+      }
+
+      .datetime-picker__dropdown {
+        width: calc(100vw - 32px);
+        max-width: 300px;
+      }
+
+      .datetime-picker__calendar-header {
+        padding: var(--space-2) var(--space-3);
+      }
+
+      .datetime-picker__day {
+        font-size: 12px;
+      }
+
+      .event-legend__grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Very small phones */
+    @media (max-width: 360px) {
+      .contact-filter {
+        width: 160px;
+      }
+
+      .contact-filter__preset {
+        padding: var(--space-1) var(--space-2);
+        font-size: 10px;
+      }
+
+      .time-controls__speed-btns {
+        gap: var(--space-1);
+      }
+
+      .time-controls__speed-btn {
+        padding: var(--space-1) var(--space-2);
+        font-size: 10px;
+      }
+    }
+
+    /* Print styles */
+    @media print {
+      .controls-top-left,
+      .controls-top-right,
+      .controls-bottom,
+      .loading-overlay {
+        display: none !important;
+      }
+
+      #map {
+        position: relative !important;
+        height: 100vh !important;
       }
     }
   </style>
@@ -1686,6 +2001,29 @@
           No contacts loaded
         </div>
       </div>
+
+      <!-- Event Type Legend -->
+      <div class="event-legend">
+        <div class="event-legend__title">Event Types</div>
+        <div class="event-legend__grid">
+          <div class="event-legend__item">
+            <div class="event-legend__color event-legend__color--call-in"></div>
+            <span class="event-legend__label">Calls In</span>
+          </div>
+          <div class="event-legend__item">
+            <div class="event-legend__color event-legend__color--call-out"></div>
+            <span class="event-legend__label">Calls Out</span>
+          </div>
+          <div class="event-legend__item">
+            <div class="event-legend__color event-legend__color--text-in"></div>
+            <span class="event-legend__label">Texts In</span>
+          </div>
+          <div class="event-legend__item">
+            <div class="event-legend__color event-legend__color--text-out"></div>
+            <span class="event-legend__label">Texts Out</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1710,6 +2048,14 @@
         </span>
       </div>
       <div class="world-clock__timezone" id="clockTimezone">UTC</div>
+      <!-- Event Stats Badge -->
+      <div class="stats-badge" id="eventStats" style="margin-top: var(--space-3);">
+        <svg class="stats-badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>
+        <span class="stats-badge__count" id="eventCount">0</span>
+        <span>events</span>
+      </div>
     </div>
   </div>
 
@@ -3320,6 +3666,12 @@
           timeRange
         });
 
+        // Update event count badge
+        const eventCountEl = document.getElementById('eventCount');
+        if (eventCountEl) {
+          eventCountEl.textContent = features.length.toLocaleString();
+        }
+
         return { features, timeRange, contacts, density };
       },
 
@@ -4077,35 +4429,99 @@
     // ============================================================
     // SAMPLE DATA: For demonstration purposes
     // Generate sample CDR events if no data is provided
+    // Creates realistic patterns: work hours, frequent contacts, clustered locations
     // ============================================================
     (function() {
       // Only generate sample data if BANDICOOT_DATA is null
       if (window.BANDICOOT_DATA !== null) return;
 
-      console.log('[SampleData] Generating demo data...');
+      console.log('[SampleData] Generating enhanced demo data...');
 
       const features = [];
-      const contacts = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry'];
-      const types = ['call', 'text'];
-      const directions = ['in', 'out'];
 
-      // Generate events over the past 7 days
+      // Contacts with varying communication frequency (realistic distribution)
+      const contacts = [
+        { id: 'Alice', weight: 25 },     // Primary contact - most frequent
+        { id: 'Bob', weight: 20 },       // Close friend
+        { id: 'Charlie', weight: 15 },   // Work colleague
+        { id: 'Diana', weight: 12 },     // Family member
+        { id: 'Eve', weight: 10 },       // Acquaintance
+        { id: 'Frank', weight: 8 },      // Occasional contact
+        { id: 'Grace', weight: 6 },      // Rare contact
+        { id: 'Henry', weight: 4 }       // Very rare
+      ];
+      const totalWeight = contacts.reduce((sum, c) => sum + c.weight, 0);
+
+      // Weighted random contact selection
+      function getWeightedContact() {
+        let random = Math.random() * totalWeight;
+        for (const contact of contacts) {
+          random -= contact.weight;
+          if (random <= 0) return contact.id;
+        }
+        return contacts[0].id;
+      }
+
+      // Location clusters (realistic movement patterns)
+      const locations = [
+        { name: 'Home', lat: 37.7749, lng: -122.4194, weight: 35, radius: 0.002 },
+        { name: 'Work', lat: 37.7849, lng: -122.4094, weight: 30, radius: 0.003 },
+        { name: 'Downtown', lat: 37.7899, lng: -122.4044, weight: 15, radius: 0.008 },
+        { name: 'Park', lat: 37.7699, lng: -122.4244, weight: 10, radius: 0.004 },
+        { name: 'Shopping', lat: 37.7649, lng: -122.4344, weight: 10, radius: 0.005 }
+      ];
+      const totalLocWeight = locations.reduce((sum, l) => sum + l.weight, 0);
+
+      // Weighted random location selection
+      function getWeightedLocation() {
+        let random = Math.random() * totalLocWeight;
+        for (const loc of locations) {
+          random -= loc.weight;
+          if (random <= 0) return loc;
+        }
+        return locations[0];
+      }
+
+      // Generate events over the past 14 days
       const now = Date.now();
-      const startTime = now - (7 * 24 * 60 * 60 * 1000); // 7 days ago
+      const startTime = now - (14 * 24 * 60 * 60 * 1000);
+      const eventCount = 350; // More events for better demo
 
-      // Random locations in a city (example: San Francisco area)
-      const baseLat = 37.7749;
-      const baseLng = -122.4194;
+      for (let i = 0; i < eventCount; i++) {
+        // Distribute events with realistic hourly patterns
+        // More activity during 8am-10pm, less at night
+        let timestamp = startTime + Math.random() * (now - startTime);
+        const hour = new Date(timestamp).getHours();
 
-      for (let i = 0; i < 200; i++) {
-        const timestamp = startTime + Math.random() * (now - startTime);
-        const contact = contacts[Math.floor(Math.random() * contacts.length)];
-        const type = types[Math.floor(Math.random() * types.length)];
-        const direction = directions[Math.floor(Math.random() * directions.length)];
+        // Reduce night events (11pm - 7am)
+        if (hour >= 23 || hour < 7) {
+          if (Math.random() > 0.15) {
+            timestamp = new Date(timestamp).setHours(8 + Math.floor(Math.random() * 14));
+          }
+        }
 
-        // Random offset from base location
-        const lat = baseLat + (Math.random() - 0.5) * 0.1;
-        const lng = baseLng + (Math.random() - 0.5) * 0.15;
+        const contact = getWeightedContact();
+        const location = getWeightedLocation();
+
+        // Calls more common with close contacts, texts more common overall
+        const isCloseContact = ['Alice', 'Bob', 'Diana'].includes(contact);
+        const type = isCloseContact ? (Math.random() < 0.45 ? 'call' : 'text') : (Math.random() < 0.25 ? 'call' : 'text');
+
+        // Incoming slightly more common than outgoing
+        const direction = Math.random() < 0.55 ? 'in' : 'out';
+
+        // Location with slight randomness within cluster radius
+        const lat = location.lat + (Math.random() - 0.5) * location.radius * 2;
+        const lng = location.lng + (Math.random() - 0.5) * location.radius * 2;
+
+        // Call durations: short (< 1min), medium (1-5min), long (5-15min)
+        let duration = null;
+        if (type === 'call') {
+          const durationClass = Math.random();
+          if (durationClass < 0.3) duration = Math.floor(Math.random() * 60) + 10;       // Short
+          else if (durationClass < 0.75) duration = Math.floor(Math.random() * 240) + 60; // Medium
+          else duration = Math.floor(Math.random() * 600) + 300;                          // Long
+        }
 
         features.push({
           type: 'Feature',
@@ -4118,18 +4534,21 @@
             interaction_type: type,
             direction: direction,
             correspondent_id: contact,
-            duration: type === 'call' ? Math.floor(Math.random() * 600) + 10 : null,
-            antenna_id: `ANT-${Math.floor(Math.random() * 50)}`
+            duration: duration,
+            antenna_id: `ANT-${location.name.substring(0, 3).toUpperCase()}-${Math.floor(Math.random() * 10)}`
           }
         });
       }
+
+      // Sort by timestamp for proper timeline
+      features.sort((a, b) => a.properties.timestamp - b.properties.timestamp);
 
       window.BANDICOOT_DATA = {
         type: 'FeatureCollection',
         features: features
       };
 
-      console.log('[SampleData] Generated', features.length, 'sample events');
+      console.log('[SampleData] Generated', features.length, 'enhanced sample events');
     })();
 
   </script>
