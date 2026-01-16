@@ -2696,7 +2696,14 @@
         // UI state
         ui: {
           contactFilterOpen: false,
-          datePickerOpen: false
+          datePickerOpen: false,
+          hamburgerMenuOpen: false,
+          settingsModalOpen: false
+        },
+
+        // Settings state
+        settings: {
+          clusteringEnabled: true
         }
       },
 
@@ -2920,6 +2927,11 @@
 
         // Listen for filter updates
         EventBus.on('filter:update', () => this.updateFilters());
+
+        // Listen for clustering setting changes
+        EventBus.on('settings:clustering-changed', ({ enabled }) => {
+          this._toggleClustering(enabled);
+        });
 
         // Emit map ready event
         EventBus.emit('map:ready', { map: this.map });
@@ -3190,14 +3202,21 @@
        * @param {Object} geojson - GeoJSON FeatureCollection
        */
       _addDataLayers(geojson) {
-        // Add clustered source
-        this.map.addSource('events', {
+        // Check if clustering is enabled
+        const clusteringEnabled = State.get('settings.clusteringEnabled');
+
+        // Build source configuration based on clustering setting
+        const sourceConfig = {
           type: 'geojson',
-          data: geojson,
-          cluster: true,
-          clusterMaxZoom: CONFIG.CLUSTER_MAX_ZOOM,
-          clusterRadius: CONFIG.CLUSTER_RADIUS,
-          clusterProperties: {
+          data: geojson
+        };
+
+        // Only add clustering properties if enabled
+        if (clusteringEnabled) {
+          sourceConfig.cluster = true;
+          sourceConfig.clusterMaxZoom = CONFIG.CLUSTER_MAX_ZOOM;
+          sourceConfig.clusterRadius = CONFIG.CLUSTER_RADIUS;
+          sourceConfig.clusterProperties = {
             // Aggregate counts by event type
             call_in: ['+', ['case', ['all',
               ['==', ['get', 'interaction_type'], 'call'],
@@ -3215,71 +3234,77 @@
               ['==', ['get', 'interaction_type'], 'text'],
               ['==', ['get', 'direction'], 'out']
             ], 1, 0]]
-          }
-        });
+          };
+        }
 
-        // Layer: Cluster circles with dynamic sizing and colors
-        this.map.addLayer({
-          id: 'clusters',
-          type: 'circle',
-          source: 'events',
-          filter: ['has', 'point_count'],
-          paint: {
-            // Color based on cluster size
-            'circle-color': [
-              'step',
-              ['get', 'point_count'],
-              '#00d4ff',  // < 10
-              10, '#7c3aed',  // 10-49
-              50, '#ff6b6b',  // 50-99
-              100, '#f59e0b'  // 100+
-            ],
-            // Size based on cluster size
-            'circle-radius': [
-              'step',
-              ['get', 'point_count'],
-              20,   // < 10
-              10, 26,   // 10-49
-              50, 32,   // 50-99
-              100, 40   // 100+
-            ],
-            'circle-stroke-width': 3,
-            'circle-stroke-color': 'rgba(255, 255, 255, 0.25)',
-            'circle-stroke-opacity': 1,
-            // Smooth transitions
-            'circle-opacity': [
-              'interpolate',
-              ['linear'],
-              ['zoom'],
-              0, 0.9,
-              CONFIG.CLUSTER_MAX_ZOOM, 0.7
-            ]
-          }
-        });
+        this.map.addSource('events', sourceConfig);
 
-        // Layer: Cluster count labels
-        this.map.addLayer({
-          id: 'cluster-count',
-          type: 'symbol',
-          source: 'events',
-          filter: ['has', 'point_count'],
-          layout: {
-            'text-field': ['get', 'point_count_abbreviated'],
-            'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
-            'text-size': 13,
-            'text-allow-overlap': true
-          },
-          paint: {
-            'text-color': '#ffffff'
-          }
-        });
+        // Only add cluster layers if clustering is enabled
+        if (clusteringEnabled) {
+          // Layer: Cluster circles with dynamic sizing and colors
+          this.map.addLayer({
+            id: 'clusters',
+            type: 'circle',
+            source: 'events',
+            filter: ['has', 'point_count'],
+            paint: {
+              // Color based on cluster size
+              'circle-color': [
+                'step',
+                ['get', 'point_count'],
+                '#00d4ff',  // < 10
+                10, '#7c3aed',  // 10-49
+                50, '#ff6b6b',  // 50-99
+                100, '#f59e0b'  // 100+
+              ],
+              // Size based on cluster size
+              'circle-radius': [
+                'step',
+                ['get', 'point_count'],
+                20,   // < 10
+                10, 26,   // 10-49
+                50, 32,   // 50-99
+                100, 40   // 100+
+              ],
+              'circle-stroke-width': 3,
+              'circle-stroke-color': 'rgba(255, 255, 255, 0.25)',
+              'circle-stroke-opacity': 1,
+              // Smooth transitions
+              'circle-opacity': [
+                'interpolate',
+                ['linear'],
+                ['zoom'],
+                0, 0.9,
+                CONFIG.CLUSTER_MAX_ZOOM, 0.7
+              ]
+            }
+          });
+
+          // Layer: Cluster count labels
+          this.map.addLayer({
+            id: 'cluster-count',
+            type: 'symbol',
+            source: 'events',
+            filter: ['has', 'point_count'],
+            layout: {
+              'text-field': ['get', 'point_count_abbreviated'],
+              'text-font': ['DIN Pro Bold', 'Arial Unicode MS Bold'],
+              'text-size': 13,
+              'text-allow-overlap': true
+            },
+            paint: {
+              'text-color': '#ffffff'
+            }
+          });
+        }
 
         // Layer: Individual event points
+        // Filter changes based on clustering: if clustered, hide points in clusters; if not, show all
         this.map.addLayer({
           id: 'unclustered-point',
           type: 'circle',
           source: 'events',
-          filter: ['!', ['has', 'point_count']],
+          filter: clusteringEnabled ? ['!', ['has', 'point_count']] : true,
           paint: {
             'circle-radius': [
               'interpolate',
@@ -3305,13 +3330,17 @@
           }
         });
 
-        // Add interactive cursors
-        this.map.on('mouseenter', 'clusters', () => {
-          this.map.getCanvas().style.cursor = 'pointer';
-        });
-        this.map.on('mouseleave', 'clusters', () => {
-          this.map.getCanvas().style.cursor = '';
-        });
+        // Add interactive cursors for clusters (only if clustering enabled)
+        if (clusteringEnabled) {
+          this.map.on('mouseenter', 'clusters', () => {
+            this.map.getCanvas().style.cursor = 'pointer';
+          });
+          this.map.on('mouseleave', 'clusters', () => {
+            this.map.getCanvas().style.cursor = '';
+          });
+        }
+
+        // Interactive cursors for individual points
         this.map.on('mouseenter', 'unclustered-point', () => {
           this.map.getCanvas().style.cursor = 'pointer';
         });
@@ -3319,8 +3348,10 @@
           this.map.getCanvas().style.cursor = '';
         });
 
-        // Cluster click: zoom in
-        this.map.on('click', 'clusters', (e) => this._handleClusterClick(e));
+        // Cluster click: zoom in (only if clustering enabled)
+        if (clusteringEnabled) {
+          this.map.on('click', 'clusters', (e) => this._handleClusterClick(e));
+        }
 
         // Point click: show popup
         this.map.on('click', 'unclustered-point', (e) => this._handlePointClick(e));
@@ -3328,8 +3359,11 @@
         // Map click: close popup when clicking empty areas
         // This handler runs after layer handlers; queryRenderedFeatures checks if we hit a feature
         this.map.on('click', (e) => {
+          const layersToQuery = clusteringEnabled
+            ? ['clusters', 'unclustered-point']
+            : ['unclustered-point'];
           const features = this.map.queryRenderedFeatures(e.point, {
-            layers: ['clusters', 'unclustered-point']
+            layers: layersToQuery
           });
           if (features.length === 0 && this.popup) {
             this.popup.remove();
@@ -3375,6 +3409,56 @@
             duration: 1000
           });
         }
+      },
+
+      /**
+       * Toggle clustering on/off by rebuilding the source
+       * @param {boolean} enabled - Whether clustering should be enabled
+       */
+      _toggleClustering(enabled) {
+        if (!this.map || !this._allFeatures || this._allFeatures.length === 0) {
+          console.warn('[MapController] Cannot toggle clustering - no data loaded');
+          return;
+        }
+
+        if (this._isStyleLoading) {
+          this._pendingOperations.push(() => this._toggleClustering(enabled));
+          return;
+        }
+
+        console.log('[MapController] Toggling clustering:', enabled ? 'enabled' : 'disabled');
+
+        // Get current filtered data from source
+        const source = this.map.getSource('events');
+        let currentData = null;
+
+        if (source && source._data) {
+          currentData = source._data;
+        }
+
+        // Use current filtered data or fall back to all features
+        const geojson = currentData || {
+          type: 'FeatureCollection',
+          features: this._allFeatures
+        };
+
+        // Close any open popup
+        if (this.popup) {
+          this.popup.remove();
+          this.popup = null;
+          this._activePopupKey = null;
+        }
+
+        // Remove existing layers and source
+        this._removeDataLayers();
+
+        // Recreate with new clustering setting
+        this._addDataLayers(geojson);
+
+        // Reapply filters
+        this.updateFilters();
+
+        console.log('[MapController] Clustering toggled successfully');
       },
 
       /**
@@ -4986,6 +5070,217 @@
     };
 
     // ============================================================
+    // MODULE: SettingsController
+    // Manages settings modal and application preferences
+    // Could be extracted to: js/controllers/SettingsController.js
+    // ============================================================
+    const SettingsController = {
+      _storageKey: 'bandicoot-cdr-settings',
+
+      /**
+       * Initialize the settings controller
+       */
+      init() {
+        console.log('[SettingsController] Initializing...');
+
+        // Load saved settings
+        this._loadSettings();
+
+        // Hamburger menu button
+        const hamburgerBtn = document.getElementById('hamburgerBtn');
+        const hamburgerMenu = document.getElementById('hamburgerMenu');
+
+        if (hamburgerBtn && hamburgerMenu) {
+          hamburgerBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleMenu();
+          });
+        }
+
+        // Settings menu item
+        const menuSettings = document.getElementById('menuSettings');
+        if (menuSettings) {
+          menuSettings.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.closeMenu();
+            this.openSettingsModal();
+          });
+
+          // Keyboard support
+          menuSettings.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              this.closeMenu();
+              this.openSettingsModal();
+            }
+          });
+        }
+
+        // Modal close button
+        const settingsClose = document.getElementById('settingsClose');
+        if (settingsClose) {
+          settingsClose.addEventListener('click', () => this.closeSettingsModal());
+        }
+
+        // Modal backdrop click
+        const modalBackdrop = document.getElementById('modalBackdrop');
+        if (modalBackdrop) {
+          modalBackdrop.addEventListener('click', () => this.closeSettingsModal());
+        }
+
+        // Close menu on outside click
+        document.addEventListener('click', (e) => {
+          if (!e.target.closest('.hamburger-menu') && State.get('ui.hamburgerMenuOpen')) {
+            this.closeMenu();
+          }
+        });
+
+        // Escape key handling
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            if (State.get('ui.settingsModalOpen')) {
+              this.closeSettingsModal();
+            } else if (State.get('ui.hamburgerMenuOpen')) {
+              this.closeMenu();
+            }
+          }
+        });
+
+        // Clustering toggle
+        const clusteringToggle = document.getElementById('settingClustering');
+        if (clusteringToggle) {
+          // Set initial state
+          clusteringToggle.checked = State.get('settings.clusteringEnabled');
+
+          clusteringToggle.addEventListener('change', (e) => {
+            const enabled = e.target.checked;
+            State.set('settings.clusteringEnabled', enabled);
+            this._saveSettings();
+            EventBus.emit('settings:clustering-changed', { enabled });
+            console.log('[SettingsController] Clustering:', enabled ? 'enabled' : 'disabled');
+          });
+        }
+
+        console.log('[SettingsController] Initialized');
+      },
+
+      /**
+       * Toggle the hamburger menu open/closed
+       */
+      toggleMenu() {
+        const isOpen = State.get('ui.hamburgerMenuOpen');
+        if (isOpen) {
+          this.closeMenu();
+        } else {
+          this.openMenu();
+        }
+      },
+
+      /**
+       * Open the hamburger menu
+       */
+      openMenu() {
+        State.set('ui.hamburgerMenuOpen', true);
+        const menu = document.getElementById('hamburgerMenu');
+        const btn = document.getElementById('hamburgerBtn');
+
+        if (menu) menu.classList.add('hamburger-menu--open');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+
+        console.log('[SettingsController] Menu opened');
+      },
+
+      /**
+       * Close the hamburger menu
+       */
+      closeMenu() {
+        State.set('ui.hamburgerMenuOpen', false);
+        const menu = document.getElementById('hamburgerMenu');
+        const btn = document.getElementById('hamburgerBtn');
+
+        if (menu) menu.classList.remove('hamburger-menu--open');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+
+        console.log('[SettingsController] Menu closed');
+      },
+
+      /**
+       * Open the settings modal
+       */
+      openSettingsModal() {
+        State.set('ui.settingsModalOpen', true);
+
+        const modal = document.getElementById('settingsModal');
+        const backdrop = document.getElementById('modalBackdrop');
+
+        if (backdrop) backdrop.classList.add('modal-backdrop--visible');
+        if (modal) modal.classList.add('settings-modal--visible');
+
+        // Trap focus in modal
+        document.body.style.overflow = 'hidden';
+
+        // Focus first interactive element
+        setTimeout(() => {
+          const firstInput = modal?.querySelector('input, button:not(.settings-modal__close)');
+          if (firstInput) firstInput.focus();
+        }, 100);
+
+        console.log('[SettingsController] Settings modal opened');
+      },
+
+      /**
+       * Close the settings modal
+       */
+      closeSettingsModal() {
+        State.set('ui.settingsModalOpen', false);
+
+        const modal = document.getElementById('settingsModal');
+        const backdrop = document.getElementById('modalBackdrop');
+
+        if (modal) modal.classList.remove('settings-modal--visible');
+        if (backdrop) backdrop.classList.remove('modal-backdrop--visible');
+
+        // Restore scroll
+        document.body.style.overflow = '';
+
+        console.log('[SettingsController] Settings modal closed');
+      },
+
+      /**
+       * Load settings from localStorage
+       */
+      _loadSettings() {
+        try {
+          const saved = localStorage.getItem(this._storageKey);
+          if (saved) {
+            const settings = JSON.parse(saved);
+            if (typeof settings.clusteringEnabled === 'boolean') {
+              State.set('settings.clusteringEnabled', settings.clusteringEnabled);
+            }
+            console.log('[SettingsController] Loaded saved settings:', settings);
+          }
+        } catch (error) {
+          console.warn('[SettingsController] Failed to load settings:', error);
+        }
+      },
+
+      /**
+       * Save settings to localStorage
+       */
+      _saveSettings() {
+        try {
+          const settings = {
+            clusteringEnabled: State.get('settings.clusteringEnabled')
+          };
+          localStorage.setItem(this._storageKey, JSON.stringify(settings));
+          console.log('[SettingsController] Saved settings');
+        } catch (error) {
+          console.warn('[SettingsController] Failed to save settings:', error);
+        }
+      }
+    };
+
+    // ============================================================
     // MODULE: Application Bootstrap
     // Initializes all modules and starts the application
     // Could be extracted to: js/main.js
@@ -5013,6 +5308,7 @@
         if (loadingSubtext) loadingSubtext.textContent = 'Initializing contact filter...';
         ContactFilter.init();
         DateTimePicker.init();
+        SettingsController.init();
 
         // Phase 4: Initialize map
         if (loadingText) loadingText.textContent = 'Loading Map';
