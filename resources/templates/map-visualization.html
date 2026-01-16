@@ -702,29 +702,13 @@
       transition: transform var(--transition-fast);
     }
 
-    .world-clock__digit--flip {
-      animation: digitFlip 200ms ease-out;
-    }
-
-    @keyframes digitFlip {
-      0% {
-        transform: translateY(-30%);
-      }
-      50% {
-        transform: translateY(3%);
-      }
-      100% {
-        transform: translateY(0);
-      }
-    }
-
     .world-clock__colon {
-      color: var(--text-muted);
+      color: var(--text-primary);
     }
 
     .world-clock__seconds {
       font-size: 18px;
-      color: var(--text-muted);
+      color: var(--text-primary);
       margin-left: var(--space-1);
     }
 
@@ -3669,7 +3653,7 @@
       },
 
       /**
-       * Update a single digit with flip animation if changed
+       * Update a single digit if changed
        * @param {string} id - Element ID
        * @param {string} value - New digit value
        */
@@ -3679,12 +3663,6 @@
 
         if (el.textContent !== value) {
           el.textContent = value;
-          // Only animate at normal speeds (1x or slower) to prevent visibility issues
-          const speed = State.get('time.speed');
-          if (speed <= 1) {
-            el.classList.add('world-clock__digit--flip');
-            setTimeout(() => el.classList.remove('world-clock__digit--flip'), 200);
-          }
         }
       }
     };
