@@ -18,8 +18,12 @@ def relationship_strength(user):
     """
     Rank contacts by communication intensity.
 
-    Combines frequency, total call duration, and interaction recency into
-    a composite score.
+    Combines normalized frequency and total call duration into a composite
+    score. Does NOT include recency weighting.
+
+    Score formula: (0.6 * normalized_count) + (0.4 * normalized_duration)
+    - normalized_count: contact's interaction count / max count across all contacts
+    - normalized_duration: contact's total call duration / max duration across all contacts
 
     Investigative Value
     -------------------
@@ -33,11 +37,31 @@ def relationship_strength(user):
     Returns
     -------
     dict
-        correspondent_id -> strength_score, sorted by score descending
+        Data-first evidence with:
+        - type: "relationship_strength"
+        - user_id: user identifier
+        - contacts: dict of correspondent_id -> {
+            score: composite score,
+            count: raw interaction count,
+            duration_sec: total call duration,
+            last_contact_ts: ISO timestamp of most recent contact,
+            score_components: {count_norm, duration_norm}
+          }
+        - methodology: weights used for scoring
     """
     records = user.records
     if len(records) == 0:
-        return {}
+        return {
+            "type": "relationship_strength",
+            "user_id": getattr(user, 'name', None),
+            "contacts": {},
+            "methodology": {
+                "count_weight": 0.6,
+                "duration_weight": 0.4,
+                "recency_weight": 0.0,
+                "note": "Recency not implemented"
+            }
+        }
 
     contact_stats = defaultdict(lambda: {'count': 0, 'duration': 0, 'last': None})
 
@@ -53,15 +77,37 @@ def relationship_strength(user):
     max_count = max(s['count'] for s in contact_stats.values())
     max_duration = max(s['duration'] for s in contact_stats.values()) or 1
 
-    scores = {}
+    contacts = {}
     for cid, stats in contact_stats.items():
-        # Weight: 50% frequency, 30% duration, 20% recency not implemented yet
-        freq_score = stats['count'] / max_count
-        dur_score = stats['duration'] / max_duration
-        scores[cid] = (0.6 * freq_score) + (0.4 * dur_score)
+        count_norm = stats['count'] / max_count
+        duration_norm = stats['duration'] / max_duration
+        score = (0.6 * count_norm) + (0.4 * duration_norm)
+
+        contacts[cid] = {
+            "score": round(score, 4),
+            "count": stats['count'],
+            "duration_sec": stats['duration'],
+            "last_contact_ts": stats['last'].isoformat() if stats['last'] else None,
+            "score_components": {
+                "count_norm": round(count_norm, 4),
+                "duration_norm": round(duration_norm, 4)
+            }
+        }
 
     # Sort by score descending
-    return dict(sorted(scores.items(), key=lambda x: x[1], reverse=True))
+    sorted_contacts = dict(sorted(contacts.items(), key=lambda x: x[1]['score'], reverse=True))
+
+    return {
+        "type": "relationship_strength",
+        "user_id": getattr(user, 'name', None),
+        "contacts": sorted_contacts,
+        "methodology": {
+            "count_weight": 0.6,
+            "duration_weight": 0.4,
+            "recency_weight": 0.0,
+            "note": "Recency not implemented"
+        }
+    }
 
 
 def reciprocity_score(user):

@@ -797,3 +797,62 @@ class TestActivityAroundTime:
                     check_no_records(item, f"{path}[{i}]")
 
         check_no_records(result)
+
+
+# ==============================================================================
+# Phase 3 Tests: Documentation and Consistency
+# ==============================================================================
+
+class TestRelationshipStrength:
+    """Tests for relationship_strength indicator."""
+
+    def test_has_type_field(self, sample_user):
+        """Verify type field is present."""
+        from custom_indicators.relationship import relationship_strength
+
+        result = relationship_strength(sample_user)
+
+        assert result['type'] == 'relationship_strength'
+
+    def test_exposes_raw_components(self, sample_user):
+        """Verify raw count and duration are exposed."""
+        from custom_indicators.relationship import relationship_strength
+
+        result = relationship_strength(sample_user)
+
+        for cid, data in result['contacts'].items():
+            assert 'count' in data
+            assert 'duration_sec' in data
+            assert 'score_components' in data
+            assert 'count_norm' in data['score_components']
+            assert 'duration_norm' in data['score_components']
+
+    def test_exposes_methodology(self, sample_user):
+        """Verify methodology/weights are exposed."""
+        from custom_indicators.relationship import relationship_strength
+
+        result = relationship_strength(sample_user)
+
+        assert 'methodology' in result
+        assert 'count_weight' in result['methodology']
+        assert 'duration_weight' in result['methodology']
+        assert result['methodology']['count_weight'] == 0.6
+        assert result['methodology']['duration_weight'] == 0.4
+
+    def test_has_last_contact_ts(self, sample_user):
+        """Verify last_contact_ts is ISO formatted."""
+        from custom_indicators.relationship import relationship_strength
+
+        result = relationship_strength(sample_user)
+
+        for cid, data in result['contacts'].items():
+            assert 'last_contact_ts' in data
+            if data['last_contact_ts']:
+                assert 'T' in data['last_contact_ts']  # ISO format
+
+    def test_no_recency_claim_in_docstring(self):
+        """Verify docstring doesn't claim recency is implemented."""
+        from custom_indicators.relationship import relationship_strength
+
+        docstring = relationship_strength.__doc__
+        assert 'Does NOT include recency' in docstring or 'not implemented' in docstring.lower()
