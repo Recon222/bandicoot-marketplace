@@ -12,8 +12,7 @@ Investigative Value
 - Detect unusual location visits around key dates
 """
 
-from bandicoot.helper.group import spatial_grouping
-from bandicoot.helper.maths import summary_stats, great_circle_distance
+from bandicoot.helper.maths import great_circle_distance
 from collections import Counter, defaultdict
 from datetime import timedelta
 
@@ -99,26 +98,34 @@ def frequent_locations_ranked(user, top_n=10):
     return results
 
 
-@spatial_grouping(user_kwd=True)
-def unusual_locations(positions, user, threshold_visits=2):
+def unusual_locations(user, threshold_visits=2):
     """
-    Locations visited fewer than threshold times.
+    Full location visit histogram with filtering for rare visits.
 
     Investigative Value
     -------------------
-    One-time or rare visits to unusual locations around key dates
-    may be significant.
+    Returns ALL location visits with counts, plus a filtered list of
+    locations visited fewer than threshold times. Does not label
+    locations as "unusual" - that interpretation is for investigators.
 
     Parameters
     ----------
+    user : bandicoot.core.User
     threshold_visits : int
-        Maximum visits to be considered "unusual"
+        Filter threshold - locations with <= this many visits are
+        included in filtered_below_threshold list
 
     Returns
     -------
-    list of dict
-        Unusual locations with visit details
+    dict
+        Data-first evidence with:
+        - type: "location_visit_histogram"
+        - all_locations: full histogram with visit_count, coord, timestamps
+        - parameters: methodology exposure (threshold_visits)
+        - filtered_below_threshold: list of antenna_ids at or below threshold
     """
+    from .utils import normalize_coordinates
+
     # Group positions by antenna and track timestamps
     location_visits = defaultdict(list)
 
@@ -126,21 +133,31 @@ def unusual_locations(positions, user, threshold_visits=2):
         if r.position.antenna:
             location_visits[r.position.antenna].append(r.datetime)
 
-    unusual = []
+    # Build full histogram
+    all_locations = {}
+    filtered_below_threshold = []
+
     for antenna_id, timestamps in location_visits.items():
+        sorted_timestamps = sorted(timestamps)
+        coord = normalize_coordinates(antenna_id, user.antennas)
+
+        all_locations[str(antenna_id)] = {
+            "visit_count": len(timestamps),
+            "coord": coord,
+            "timestamps": [ts.isoformat() for ts in sorted_timestamps]
+        }
+
         if len(timestamps) <= threshold_visits:
-            coords = None
-            if user.antennas and antenna_id in user.antennas:
-                coords = user.antennas[antenna_id]
+            filtered_below_threshold.append(str(antenna_id))
 
-            unusual.append({
-                'antenna_id': antenna_id,
-                'coordinates': coords,
-                'visit_count': len(timestamps),
-                'timestamps': sorted(timestamps)
-            })
-
-    return unusual
+    return {
+        "type": "location_visit_histogram",
+        "all_locations": all_locations,
+        "parameters": {
+            "threshold_visits": threshold_visits
+        },
+        "filtered_below_threshold": filtered_below_threshold
+    }
 
 
 def location_transitions(user):
@@ -192,7 +209,7 @@ def location_transitions(user):
     return transitions
 
 
-def time_at_locations(user):
+def time_at_locations(user, minutes_per_hit=30):
     """
     Estimate time spent at each location based on record counts.
 
@@ -203,21 +220,52 @@ def time_at_locations(user):
     Parameters
     ----------
     user : bandicoot.core.User
+    minutes_per_hit : int
+        Assumed time per record (default 30 min). Exposed in output.
 
     Returns
     -------
     dict
-        antenna_id -> estimated_hours (rough estimate: each record ~30 min)
+        Data-first evidence with:
+        - type: "time_at_locations"
+        - locations: dict of antenna_id -> {hit_count, estimated_hours, assumption_minutes_per_hit}
+        - totals: summary statistics
     """
+    from .utils import normalize_coordinates
+
     records = [r for r in user.records if r.position.antenna]
     if not records:
-        return {}
+        return {
+            "type": "time_at_locations",
+            "locations": {},
+            "totals": {
+                "total_records_with_location": 0,
+                "unique_antennas": 0
+            }
+        }
 
-    # Simple estimation: count records at each location
-    # Rough estimate: each record represents ~30 min window
+    # Count records at each location
     location_counts = Counter(r.position.antenna for r in records)
 
-    return {str(antenna): count * 0.5 for antenna, count in location_counts.items()}
+    # Build locations dict with raw counts and estimates
+    locations = {}
+    for antenna_id, count in location_counts.items():
+        coord = normalize_coordinates(antenna_id, user.antennas)
+        locations[str(antenna_id)] = {
+            "hit_count": count,
+            "estimated_hours": count * (minutes_per_hit / 60),
+            "assumption_minutes_per_hit": minutes_per_hit,
+            "coord": coord
+        }
+
+    return {
+        "type": "time_at_locations",
+        "locations": locations,
+        "totals": {
+            "total_records_with_location": len(records),
+            "unique_antennas": len(location_counts)
+        }
+    }
 
 
 def location_at_specific_time(user, target_datetime, window_minutes=30):

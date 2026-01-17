@@ -89,7 +89,8 @@ def activity_bursts(user, window_minutes=30, threshold_multiplier=3):
     Investigative Value
     -------------------
     Bursts around key times may indicate coordination, panic,
-    or crisis response.
+    or crisis response. Exposes the baseline and threshold values
+    used for classification.
 
     Parameters
     ----------
@@ -101,19 +102,53 @@ def activity_bursts(user, window_minutes=30, threshold_multiplier=3):
 
     Returns
     -------
-    list of dict
-        Each burst: {'start': datetime, 'end': datetime, 'count': int}
+    dict
+        Data-first evidence with:
+        - type: "activity_bursts"
+        - parameters: window_minutes, threshold_multiplier, computed_avg_rate, computed_threshold
+        - data_span: first_record, last_record, total_records
+        - bursts: list of {start_ts, end_ts, count, contacts, events}
     """
+    from .utils import serialize_record
+
     records = user.records
     if len(records) < 2:
-        return []
+        return {
+            "type": "activity_bursts",
+            "parameters": {
+                "window_minutes": window_minutes,
+                "threshold_multiplier": threshold_multiplier,
+                "computed_avg_rate": None,
+                "computed_threshold": None
+            },
+            "data_span": {
+                "first_record": None,
+                "last_record": None,
+                "total_records": len(records)
+            },
+            "bursts": []
+        }
 
     sorted_records = sorted(records, key=lambda r: r.datetime)
 
     # Calculate average activity rate
     total_seconds = (sorted_records[-1].datetime - sorted_records[0].datetime).total_seconds()
     if total_seconds == 0:
-        return []
+        return {
+            "type": "activity_bursts",
+            "parameters": {
+                "window_minutes": window_minutes,
+                "threshold_multiplier": threshold_multiplier,
+                "computed_avg_rate": None,
+                "computed_threshold": None
+            },
+            "data_span": {
+                "first_record": sorted_records[0].datetime.isoformat(),
+                "last_record": sorted_records[-1].datetime.isoformat(),
+                "total_records": len(records)
+            },
+            "bursts": []
+        }
 
     avg_rate = len(records) / (total_seconds / (window_minutes * 60))
     threshold = avg_rate * threshold_multiplier
@@ -134,17 +169,32 @@ def activity_bursts(user, window_minutes=30, threshold_multiplier=3):
 
         if count >= threshold:
             bursts.append({
-                'start': window_start,
-                'end': window_end,
-                'count': count,
-                'contacts': list(set(r.correspondent_id for r in window_records))
+                "start_ts": window_start.isoformat(),
+                "end_ts": window_end.isoformat(),
+                "count": count,
+                "contacts": list(set(r.correspondent_id for r in window_records)),
+                "events": [serialize_record(r) for r in window_records]
             })
             # Skip to end of this burst
             i += count
         else:
             i += 1
 
-    return bursts
+    return {
+        "type": "activity_bursts",
+        "parameters": {
+            "window_minutes": window_minutes,
+            "threshold_multiplier": threshold_multiplier,
+            "computed_avg_rate": round(avg_rate, 4),
+            "computed_threshold": round(threshold, 4)
+        },
+        "data_span": {
+            "first_record": sorted_records[0].datetime.isoformat(),
+            "last_record": sorted_records[-1].datetime.isoformat(),
+            "total_records": len(records)
+        },
+        "bursts": bursts
+    }
 
 
 def contact_first_appearance(user):
@@ -229,8 +279,7 @@ def daily_activity_counts(user):
     return dict(Counter(r.datetime.date() for r in records))
 
 
-@grouping
-def inter_event_times(records):
+def inter_event_times(user):
     """
     Distribution of time between consecutive interactions.
 
@@ -238,19 +287,51 @@ def inter_event_times(records):
     -------------------
     Unusual clustering or spacing of communications.
 
+    Parameters
+    ----------
+    user : bandicoot.core.User
+
     Returns
     -------
-    SummaryStats
-        Statistics of inter-event times in seconds
+    dict
+        Data-first evidence with:
+        - type: "inter_event_times"
+        - deltas_seconds: raw list of all inter-event times
+        - summary: mean, std, min, max, median, count
     """
+    records = user.records
     if len(records) < 2:
-        return summary_stats([])
+        return {
+            "type": "inter_event_times",
+            "deltas_seconds": [],
+            "summary": {
+                "mean": None,
+                "std": None,
+                "min": None,
+                "max": None,
+                "median": None,
+                "count": 0
+            }
+        }
 
     sorted_records = sorted(records, key=lambda r: r.datetime)
     deltas = [(b.datetime - a.datetime).total_seconds()
               for a, b in pairwise(sorted_records)]
 
-    return summary_stats(deltas)
+    stats = summary_stats(deltas)
+
+    return {
+        "type": "inter_event_times",
+        "deltas_seconds": deltas,
+        "summary": {
+            "mean": stats.mean if hasattr(stats, 'mean') else stats.get('mean'),
+            "std": stats.std if hasattr(stats, 'std') else stats.get('std'),
+            "min": stats.min if hasattr(stats, 'min') else stats.get('min'),
+            "max": stats.max if hasattr(stats, 'max') else stats.get('max'),
+            "median": stats.median if hasattr(stats, 'median') else stats.get('median'),
+            "count": len(deltas)
+        }
+    }
 
 
 def activity_around_time(user, target_datetime, hours_before=24, hours_after=24):
@@ -273,9 +354,16 @@ def activity_around_time(user, target_datetime, hours_before=24, hours_after=24)
     Returns
     -------
     dict
-        'before': list of records, 'after': list of records,
-        'contacts_before': Counter, 'contacts_after': Counter
+        Data-first evidence with:
+        - type: "activity_around_time"
+        - user_id: user identifier
+        - window: center_ts, before_hours, after_hours
+        - support: events_before, events_after, total_events
+        - before: events (serialized), contacts, unique_contacts
+        - after: events (serialized), contacts, unique_contacts
     """
+    from .utils import serialize_record
+
     before_start = target_datetime - timedelta(hours=hours_before)
     after_end = target_datetime + timedelta(hours=hours_after)
 
@@ -284,13 +372,32 @@ def activity_around_time(user, target_datetime, hours_before=24, hours_after=24)
     after_records = [r for r in user.records
                      if target_datetime <= r.datetime <= after_end]
 
+    contacts_before = Counter(r.correspondent_id for r in before_records)
+    contacts_after = Counter(r.correspondent_id for r in after_records)
+
     return {
-        'before': before_records,
-        'after': after_records,
-        'contacts_before': Counter(r.correspondent_id for r in before_records),
-        'contacts_after': Counter(r.correspondent_id for r in after_records),
-        'count_before': len(before_records),
-        'count_after': len(after_records)
+        "type": "activity_around_time",
+        "user_id": getattr(user, 'name', None),
+        "window": {
+            "center_ts": target_datetime.isoformat(),
+            "before_hours": hours_before,
+            "after_hours": hours_after
+        },
+        "support": {
+            "events_before": len(before_records),
+            "events_after": len(after_records),
+            "total_events": len(before_records) + len(after_records)
+        },
+        "before": {
+            "events": [serialize_record(r) for r in sorted(before_records, key=lambda x: x.datetime)],
+            "contacts": dict(contacts_before),
+            "unique_contacts": len(contacts_before)
+        },
+        "after": {
+            "events": [serialize_record(r) for r in sorted(after_records, key=lambda x: x.datetime)],
+            "contacts": dict(contacts_after),
+            "unique_contacts": len(contacts_after)
+        }
     }
 
 

@@ -525,3 +525,275 @@ class TestNormalizeCoordinates:
         result = normalize_coordinates('tower1', None)
 
         assert result is None
+
+
+# ==============================================================================
+# Phase 2 Tests: Medium Priority Refactors
+# ==============================================================================
+
+class TestTimeAtLocations:
+    """Tests for time_at_locations indicator."""
+
+    def test_has_type_field(self, sample_user):
+        """Verify type field is present."""
+        from custom_indicators.location import time_at_locations
+
+        result = time_at_locations(sample_user)
+
+        assert result['type'] == 'time_at_locations'
+
+    def test_exposes_hit_count(self, sample_user):
+        """Verify raw hit_count is exposed."""
+        from custom_indicators.location import time_at_locations
+
+        result = time_at_locations(sample_user)
+
+        assert 'locations' in result
+        for antenna_id, data in result['locations'].items():
+            assert 'hit_count' in data
+            assert isinstance(data['hit_count'], int)
+
+    def test_exposes_assumption(self, sample_user):
+        """Verify assumption_minutes_per_hit is exposed."""
+        from custom_indicators.location import time_at_locations
+
+        result = time_at_locations(sample_user, minutes_per_hit=15)
+
+        for antenna_id, data in result['locations'].items():
+            assert data['assumption_minutes_per_hit'] == 15
+
+    def test_has_totals(self, sample_user):
+        """Verify totals summary is present."""
+        from custom_indicators.location import time_at_locations
+
+        result = time_at_locations(sample_user)
+
+        assert 'totals' in result
+        assert 'total_records_with_location' in result['totals']
+        assert 'unique_antennas' in result['totals']
+
+
+class TestUnusualLocations:
+    """Tests for unusual_locations indicator (now location_visit_histogram)."""
+
+    def test_has_type_field(self, sample_user):
+        """Verify type field is present."""
+        from custom_indicators.location import unusual_locations
+
+        result = unusual_locations(sample_user)
+
+        assert result['type'] == 'location_visit_histogram'
+
+    def test_returns_all_locations(self, sample_user):
+        """Verify all_locations contains full histogram."""
+        from custom_indicators.location import unusual_locations
+
+        result = unusual_locations(sample_user)
+
+        assert 'all_locations' in result
+        # Should have entries for all antennas in sample_user
+        assert len(result['all_locations']) > 0
+
+    def test_exposes_parameters(self, sample_user):
+        """Verify parameters are exposed."""
+        from custom_indicators.location import unusual_locations
+
+        result = unusual_locations(sample_user, threshold_visits=5)
+
+        assert 'parameters' in result
+        assert result['parameters']['threshold_visits'] == 5
+
+    def test_has_filtered_list(self, sample_user):
+        """Verify filtered_below_threshold list is present."""
+        from custom_indicators.location import unusual_locations
+
+        result = unusual_locations(sample_user)
+
+        assert 'filtered_below_threshold' in result
+        assert isinstance(result['filtered_below_threshold'], list)
+
+    def test_timestamps_are_iso(self, sample_user):
+        """Verify timestamps are ISO formatted."""
+        from custom_indicators.location import unusual_locations
+
+        result = unusual_locations(sample_user)
+
+        for antenna_id, data in result['all_locations'].items():
+            for ts in data['timestamps']:
+                assert 'T' in ts  # ISO format includes T
+
+
+class TestActivityBursts:
+    """Tests for activity_bursts indicator."""
+
+    def test_has_type_field(self, sample_user):
+        """Verify type field is present."""
+        from custom_indicators.temporal import activity_bursts
+
+        result = activity_bursts(sample_user)
+
+        assert result['type'] == 'activity_bursts'
+
+    def test_exposes_computed_parameters(self, sample_user):
+        """Verify computed avg_rate and threshold are exposed."""
+        from custom_indicators.temporal import activity_bursts
+
+        result = activity_bursts(sample_user)
+
+        assert 'parameters' in result
+        assert 'computed_avg_rate' in result['parameters']
+        assert 'computed_threshold' in result['parameters']
+        assert 'window_minutes' in result['parameters']
+        assert 'threshold_multiplier' in result['parameters']
+
+    def test_has_data_span(self, sample_user):
+        """Verify data_span shows analysis range."""
+        from custom_indicators.temporal import activity_bursts
+
+        result = activity_bursts(sample_user)
+
+        assert 'data_span' in result
+        assert 'first_record' in result['data_span']
+        assert 'last_record' in result['data_span']
+        assert 'total_records' in result['data_span']
+
+    def test_bursts_have_events(self):
+        """Verify bursts include serialized events."""
+        from custom_indicators.temporal import activity_bursts
+
+        # Create user with many records in short period (guaranteed burst)
+        base_time = datetime(2024, 1, 15, 14, 0, 0)
+        records = [
+            MockRecord(base_time + timedelta(minutes=i), antenna='tower1')
+            for i in range(20)  # 20 records in 20 minutes
+        ]
+        user = MockUser(name='burst_user', records=records)
+
+        result = activity_bursts(user, window_minutes=30, threshold_multiplier=1)
+
+        if result['bursts']:
+            burst = result['bursts'][0]
+            assert 'events' in burst
+            assert len(burst['events']) > 0
+            assert_valid_event(burst['events'][0])
+
+
+class TestInterEventTimes:
+    """Tests for inter_event_times indicator."""
+
+    def test_has_type_field(self, sample_user):
+        """Verify type field is present."""
+        from custom_indicators.temporal import inter_event_times
+
+        result = inter_event_times(sample_user)
+
+        assert result['type'] == 'inter_event_times'
+
+    def test_returns_raw_deltas(self, sample_user):
+        """Verify raw deltas_seconds list is returned."""
+        from custom_indicators.temporal import inter_event_times
+
+        result = inter_event_times(sample_user)
+
+        assert 'deltas_seconds' in result
+        assert isinstance(result['deltas_seconds'], list)
+
+    def test_has_summary_stats(self, sample_user):
+        """Verify summary statistics are present."""
+        from custom_indicators.temporal import inter_event_times
+
+        result = inter_event_times(sample_user)
+
+        assert 'summary' in result
+        assert 'mean' in result['summary']
+        assert 'std' in result['summary']
+        assert 'min' in result['summary']
+        assert 'max' in result['summary']
+        assert 'median' in result['summary']
+        assert 'count' in result['summary']
+
+    def test_handles_empty_records(self):
+        """Verify handles user with < 2 records."""
+        from custom_indicators.temporal import inter_event_times
+
+        user = MockUser(name='empty', records=[])
+        result = inter_event_times(user)
+
+        assert result['deltas_seconds'] == []
+        assert result['summary']['count'] == 0
+
+
+class TestActivityAroundTime:
+    """Tests for activity_around_time indicator."""
+
+    def test_has_type_field(self, sample_user):
+        """Verify type field is present."""
+        from custom_indicators.temporal import activity_around_time
+
+        target = datetime(2024, 1, 15, 14, 0, 0)
+        result = activity_around_time(sample_user, target)
+
+        assert result['type'] == 'activity_around_time'
+
+    def test_events_serialized(self, sample_user):
+        """Verify events are serialized, not raw Record objects."""
+        from custom_indicators.temporal import activity_around_time
+
+        target = datetime(2024, 1, 15, 14, 0, 0)
+        result = activity_around_time(sample_user, target)
+
+        # Check before events
+        for event in result['before']['events']:
+            assert_valid_event(event)
+
+        # Check after events
+        for event in result['after']['events']:
+            assert_valid_event(event)
+
+    def test_has_window_spec(self, sample_user):
+        """Verify window specification is present."""
+        from custom_indicators.temporal import activity_around_time
+
+        target = datetime(2024, 1, 15, 14, 0, 0)
+        result = activity_around_time(sample_user, target,
+                                       hours_before=12, hours_after=6)
+
+        assert 'window' in result
+        assert result['window']['before_hours'] == 12
+        assert result['window']['after_hours'] == 6
+        assert 'center_ts' in result['window']
+
+    def test_has_unique_contacts_count(self, sample_user):
+        """Verify unique_contacts count is present."""
+        from custom_indicators.temporal import activity_around_time
+
+        target = datetime(2024, 1, 15, 14, 0, 0)
+        result = activity_around_time(sample_user, target)
+
+        assert 'unique_contacts' in result['before']
+        assert 'unique_contacts' in result['after']
+
+    def test_no_raw_record_objects(self, sample_user):
+        """Verify no raw Record objects in output."""
+        from custom_indicators.temporal import activity_around_time
+
+        target = datetime(2024, 1, 15, 14, 0, 0)
+        result = activity_around_time(sample_user, target)
+
+        # Old API returned raw records in 'before' and 'after' lists
+        # New API should only have 'events' which are serialized
+        assert 'events' in result['before']
+        assert 'events' in result['after']
+
+        # Verify no raw Record objects exist anywhere
+        def check_no_records(obj, path=""):
+            if hasattr(obj, 'datetime') and hasattr(obj, 'interaction'):
+                raise AssertionError(f"Raw Record object found at {path}")
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    check_no_records(v, f"{path}.{k}")
+            elif isinstance(obj, list):
+                for i, item in enumerate(obj):
+                    check_no_records(item, f"{path}[{i}]")
+
+        check_no_records(result)
