@@ -856,3 +856,174 @@ class TestRelationshipStrength:
 
         docstring = relationship_strength.__doc__
         assert 'Does NOT include recency' in docstring or 'not implemented' in docstring.lower()
+
+
+# ==============================================================================
+# Phase 4 Tests: Renderer Layer
+# ==============================================================================
+
+class TestRenderEvidence:
+    """Tests for render_evidence function."""
+
+    def test_render_location_at_time(self, sample_user):
+        """Test rendering location_at_time evidence."""
+        from custom_indicators.location import location_at_specific_time
+        from custom_indicators.render import render_evidence, render_evidence_compact
+
+        target = datetime(2024, 1, 15, 14, 0, 0)
+        result = location_at_specific_time(sample_user, target)
+
+        lines = render_evidence(result)
+        assert len(lines) > 0
+        assert all(isinstance(line, str) for line in lines)
+
+        # Check no forbidden words
+        forbidden = ['confidence', 'suspicious', 'likely', 'probably']
+        for line in lines:
+            for word in forbidden:
+                assert word.lower() not in line.lower(), f"Found '{word}' in: {line}"
+
+        # Test compact version
+        compact = render_evidence_compact(result)
+        assert isinstance(compact, str)
+
+    def test_render_group_locations_at_time(self, two_users_same_antenna):
+        """Test rendering group_locations_at_time evidence."""
+        from custom_indicators.colocation import group_locations_at_time
+        from custom_indicators.render import render_evidence
+
+        user_a, user_b = two_users_same_antenna
+        target = datetime(2024, 1, 15, 14, 0, 0)
+
+        result = group_locations_at_time([user_a, user_b], ['user_a', 'user_b'], target)
+
+        lines = render_evidence(result)
+        assert len(lines) > 0
+
+    def test_render_colocation_with_context(self, two_users_same_antenna):
+        """Test rendering colocation_with_context evidence."""
+        from custom_indicators.colocation import meeting_detection
+        from custom_indicators.render import render_evidence
+
+        user_a, user_b = two_users_same_antenna
+        results = meeting_detection(user_a, user_b)
+
+        if results:
+            lines = render_evidence(results[0])
+            assert len(lines) > 0
+
+    def test_render_synchronized_silence(self, users_with_silence):
+        """Test rendering synchronized_silence evidence."""
+        from custom_indicators.colocation import synchronized_silence
+        from custom_indicators.render import render_evidence
+
+        users, user_ids = users_with_silence
+        results = synchronized_silence(users, user_ids, min_silence_minutes=60)
+
+        if results:
+            lines = render_evidence(results[0])
+            assert len(lines) > 0
+
+            # Verify no subjective words
+            forbidden = ['suspicious', 'suspicion', 'likely']
+            for line in lines:
+                for word in forbidden:
+                    assert word.lower() not in line.lower()
+
+    def test_render_activity_around_time(self, sample_user):
+        """Test rendering activity_around_time evidence."""
+        from custom_indicators.temporal import activity_around_time
+        from custom_indicators.render import render_evidence
+
+        target = datetime(2024, 1, 15, 14, 0, 0)
+        result = activity_around_time(sample_user, target)
+
+        lines = render_evidence(result)
+        assert len(lines) > 0
+
+    def test_render_relationship_strength(self, sample_user):
+        """Test rendering relationship_strength evidence."""
+        from custom_indicators.relationship import relationship_strength
+        from custom_indicators.render import render_evidence
+
+        result = relationship_strength(sample_user)
+
+        lines = render_evidence(result)
+        assert len(lines) > 0
+
+    def test_render_activity_bursts(self, sample_user):
+        """Test rendering activity_bursts evidence."""
+        from custom_indicators.temporal import activity_bursts
+        from custom_indicators.render import render_evidence
+
+        result = activity_bursts(sample_user)
+
+        lines = render_evidence(result)
+        assert len(lines) > 0
+
+    def test_render_inter_event_times(self, sample_user):
+        """Test rendering inter_event_times evidence."""
+        from custom_indicators.temporal import inter_event_times
+        from custom_indicators.render import render_evidence
+
+        result = inter_event_times(sample_user)
+
+        lines = render_evidence(result)
+        assert len(lines) > 0
+
+    def test_render_time_at_locations(self, sample_user):
+        """Test rendering time_at_locations evidence."""
+        from custom_indicators.location import time_at_locations
+        from custom_indicators.render import render_evidence
+
+        result = time_at_locations(sample_user)
+
+        lines = render_evidence(result)
+        assert len(lines) > 0
+
+    def test_render_location_visit_histogram(self, sample_user):
+        """Test rendering location_visit_histogram evidence."""
+        from custom_indicators.location import unusual_locations
+        from custom_indicators.render import render_evidence
+
+        result = unusual_locations(sample_user)
+
+        lines = render_evidence(result)
+        assert len(lines) > 0
+
+    def test_unknown_type_handled(self):
+        """Test that unknown evidence types are handled gracefully."""
+        from custom_indicators.render import render_evidence
+
+        result = {"type": "unknown_type_xyz", "data": "test"}
+        lines = render_evidence(result)
+
+        assert len(lines) == 1
+        assert "Unknown evidence type" in lines[0]
+
+
+class TestRenderEvidenceCompact:
+    """Tests for render_evidence_compact function."""
+
+    def test_compact_returns_string(self, sample_user):
+        """Test that compact renderer returns a string."""
+        from custom_indicators.location import location_at_specific_time
+        from custom_indicators.render import render_evidence_compact
+
+        target = datetime(2024, 1, 15, 14, 0, 0)
+        result = location_at_specific_time(sample_user, target)
+
+        compact = render_evidence_compact(result)
+        assert isinstance(compact, str)
+        assert len(compact) > 0
+
+    def test_compact_single_line(self, sample_user):
+        """Test that compact renderer returns a single line."""
+        from custom_indicators.location import location_at_specific_time
+        from custom_indicators.render import render_evidence_compact
+
+        target = datetime(2024, 1, 15, 14, 0, 0)
+        result = location_at_specific_time(sample_user, target)
+
+        compact = render_evidence_compact(result)
+        assert '\n' not in compact

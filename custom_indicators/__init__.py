@@ -37,6 +37,7 @@ from . import location
 from . import colocation
 from . import network
 from . import utils
+from . import render
 
 __all__ = [
     'relationship',
@@ -45,6 +46,7 @@ __all__ = [
     'colocation',
     'network',
     'utils',
+    'render',
 ]
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'  # Bumped for data-first refactor
