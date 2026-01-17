@@ -240,38 +240,106 @@ def location_at_specific_time(user, target_datetime, window_minutes=30):
     Returns
     -------
     dict or None
-        Location info with confidence based on record proximity
+        Data-first location evidence with:
+        - type: "location_at_time"
+        - user_id: user identifier
+        - window: search parameters
+        - support: objective strength metrics (no confidence labels)
+        - location: antenna_id and normalized coordinates
+        - closest_event: serialized event data
+        - events_in_window: all events found in window
+        - coverage: data availability metrics
     """
+    from .utils import serialize_record, normalize_coordinates
+
     window = timedelta(minutes=window_minutes)
     window_start = target_datetime - window
     window_end = target_datetime + window
 
-    # Find records in window
-    window_records = [r for r in user.records
-                      if window_start <= r.datetime <= window_end
-                      and r.position.antenna is not None]
+    # Find all records in window (with or without antenna)
+    all_window_records = [r for r in user.records
+                          if window_start <= r.datetime <= window_end]
+
+    # Find records with antenna data
+    window_records = [r for r in all_window_records
+                      if r.position.antenna is not None]
 
     if not window_records:
+        # No location data but may have records
+        if all_window_records:
+            return {
+                "type": "location_at_time",
+                "user_id": getattr(user, 'name', None),
+                "window": {
+                    "center_ts": target_datetime.isoformat(),
+                    "before_min": window_minutes,
+                    "after_min": window_minutes
+                },
+                "support": {
+                    "closest_event_delta_sec": None,
+                    "events_in_window": len(all_window_records),
+                    "has_location": False,
+                    "location_event_delta_sec": None
+                },
+                "location": {
+                    "antenna_id": None,
+                    "coord": None
+                },
+                "closest_event": None,
+                "events_in_window": [serialize_record(r) for r in sorted(all_window_records, key=lambda x: x.datetime)],
+                "coverage": {
+                    "total_events_in_window": len(all_window_records),
+                    "events_with_antenna": 0,
+                    "missing_antenna_events": len(all_window_records)
+                }
+            }
         return None
 
-    # Find closest record to target time
+    # Find closest record with location to target time
     closest = min(window_records,
                   key=lambda r: abs((r.datetime - target_datetime).total_seconds()))
 
-    coords = None
-    if user.antennas and closest.position.antenna in user.antennas:
-        coords = user.antennas[closest.position.antenna]
-
     delta_seconds = abs((closest.datetime - target_datetime).total_seconds())
 
+    # Normalize coordinates
+    coord = normalize_coordinates(closest.position.antenna, user.antennas)
+
+    # Count antenna coverage
+    events_with_antenna = len(window_records)
+    missing_antenna_events = len(all_window_records) - events_with_antenna
+
     return {
-        'antenna_id': closest.position.antenna,
-        'coordinates': coords,
-        'record_datetime': closest.datetime,
-        'delta_seconds': delta_seconds,
-        'confidence': 'high' if delta_seconds < 300 else 'medium' if delta_seconds < 900 else 'low',
-        'interaction': closest.interaction,
-        'correspondent_id': closest.correspondent_id
+        "type": "location_at_time",
+        "user_id": getattr(user, 'name', None),
+        "window": {
+            "center_ts": target_datetime.isoformat(),
+            "before_min": window_minutes,
+            "after_min": window_minutes
+        },
+        "support": {
+            "closest_event_delta_sec": delta_seconds,
+            "events_in_window": len(all_window_records),
+            "has_location": True,
+            "location_event_delta_sec": delta_seconds
+        },
+        "location": {
+            "antenna_id": closest.position.antenna,
+            "coord": coord
+        },
+        "closest_event": {
+            "ts": closest.datetime.isoformat(),
+            "interaction": closest.interaction,
+            "direction": closest.direction,
+            "correspondent_id": closest.correspondent_id,
+            "duration_sec": closest.call_duration,
+            "antenna_id": closest.position.antenna
+        },
+        "events_in_window": [serialize_record(r) for r in sorted(all_window_records, key=lambda x: x.datetime)],
+        "coverage": {
+            "total_events_in_window": len(all_window_records),
+            "events_with_antenna": events_with_antenna,
+            "missing_antenna_events": missing_antenna_events
+        }
     }
 
 

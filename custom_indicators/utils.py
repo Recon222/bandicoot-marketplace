@@ -272,3 +272,110 @@ def format_duration(seconds):
         parts.append(f"{secs}s")
 
     return " ".join(parts)
+
+
+# ==============================================================================
+# Data-First Utilities (Serialization and Normalization)
+# ==============================================================================
+
+def serialize_record(record):
+    """
+    Serialize a Bandicoot Record to standard Event format.
+
+    Parameters
+    ----------
+    record : bandicoot.core.Record
+
+    Returns
+    -------
+    dict
+        Standardized Event dictionary with fields:
+        - ts: ISO 8601 timestamp
+        - interaction: call|text|data|unknown
+        - direction: in|out|unknown
+        - correspondent_id: contact phone/ID
+        - duration_sec: call duration (None for texts)
+        - antenna_id: antenna/tower ID
+    """
+    return {
+        "ts": record.datetime.isoformat() if record.datetime else None,
+        "interaction": record.interaction,
+        "direction": record.direction,
+        "correspondent_id": record.correspondent_id,
+        "duration_sec": record.call_duration,
+        "antenna_id": record.position.antenna if record.position else None
+    }
+
+
+def serialize_record_dict(record_dict):
+    """
+    Serialize a record-like dictionary to standard Event format.
+
+    Used for dictionaries that have record-like fields (e.g., from
+    synchronized_silence context data).
+
+    Parameters
+    ----------
+    record_dict : dict
+        Dictionary with record-like fields
+
+    Returns
+    -------
+    dict
+        Standardized Event dictionary
+    """
+    dt = record_dict.get('datetime')
+    return {
+        "ts": dt.isoformat() if dt else None,
+        "interaction": record_dict.get('interaction'),
+        "direction": record_dict.get('direction'),
+        "correspondent_id": record_dict.get('correspondent_id'),
+        "duration_sec": record_dict.get('call_duration'),
+        "antenna_id": record_dict.get('antenna_id')
+    }
+
+
+def normalize_coordinates(antenna_id, antennas_dict):
+    """
+    Extract and normalize coordinates to standard Coord format.
+
+    Parameters
+    ----------
+    antenna_id : str
+        The antenna identifier
+    antennas_dict : dict
+        User's antennas dictionary
+
+    Returns
+    -------
+    dict or None
+        {"lat": float, "lon": float} or None if not available
+    """
+    if not antennas_dict or antenna_id not in antennas_dict:
+        return None
+
+    ant_data = antennas_dict[antenna_id]
+
+    # Handle Position object (from Bandicoot)
+    if hasattr(ant_data, 'latitude') and hasattr(ant_data, 'longitude'):
+        lat = ant_data.latitude
+        lon = ant_data.longitude
+        if lat is not None and lon is not None:
+            return {"lat": lat, "lon": lon}
+        return None
+
+    # Handle tuple/list (lat, lon)
+    if isinstance(ant_data, (list, tuple)) and len(ant_data) >= 2:
+        lat, lon = ant_data[0], ant_data[1]
+        if lat is not None and lon is not None:
+            return {"lat": lat, "lon": lon}
+        return None
+
+    # Handle dict with various key names
+    if isinstance(ant_data, dict):
+        if 'lat' in ant_data and 'lon' in ant_data:
+            return {"lat": ant_data['lat'], "lon": ant_data['lon']}
+        if 'latitude' in ant_data and 'longitude' in ant_data:
+            return {"lat": ant_data['latitude'], "lon": ant_data['longitude']}
+
+    return None

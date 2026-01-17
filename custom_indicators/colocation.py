@@ -150,17 +150,17 @@ def travel_pattern_match(user_a, user_b, window_minutes=60, min_sequence_length=
 def meeting_detection(user_a, user_b, colocation_window_minutes=30,
                       gap_threshold_minutes=60):
     """
-    Identify likely in-person meetings between subjects.
+    Detect co-locations with surrounding activity context.
 
-    A meeting is detected when:
-    1. Both users are at the same antenna within the time window
-    2. There's a communication gap between them during/around the co-location
-       (people don't call each other when meeting in person)
+    Finds times when both users were at the same antenna within a time window,
+    and provides the surrounding activity context for each user. Does NOT
+    claim these are "meetings" - that is an interpretation for investigators.
 
     Investigative Value
     -------------------
-    In-person meetings are critical events - when people meet, they often
-    stop calling/texting each other.
+    Co-location with activity context helps investigators evaluate whether
+    users may have met in person. Low surrounding activity may suggest
+    in-person interaction (no need to call when together).
 
     Parameters
     ----------
@@ -169,52 +169,73 @@ def meeting_detection(user_a, user_b, colocation_window_minutes=30,
     colocation_window_minutes : int
         Time window for co-location detection
     gap_threshold_minutes : int
-        Communication gap suggesting in-person meeting
+        Window around co-location to count surrounding activity
 
     Returns
     -------
     list of dict
-        Probable meetings with confidence scores
+        Data-first evidence with:
+        - type: "colocation_with_context"
+        - colocation: antenna_id, coord, user times, delta
+        - activity_context: records_around for each user
+        - parameters: methodology exposure
     """
+    from .utils import serialize_record, normalize_coordinates
+
     # First find co-locations
     colocations = antenna_overlap(user_a, user_b, colocation_window_minutes)
 
     if not colocations:
         return []
 
-    # Get communication between the two users
-    # Find user_b's phone number (filename)
-    user_b_id = None
-    for r in user_a.records:
-        # Check if this correspondent appears in user_b's records as the ego
-        # This is a heuristic - in practice, you'd pass the IDs explicitly
-        pass
-
-    # For now, check for communication gaps around co-location times
-    meetings = []
     gap_seconds = gap_threshold_minutes * 60
+    results = []
+
+    # Get antennas dict for coordinates
+    antennas = user_a.antennas or user_b.antennas or {}
 
     for coloc in colocations:
-        meeting_time = coloc['user_a_time']
+        coloc_time = coloc['user_a_time']
 
-        # Check if there's a communication gap around this time
-        # (simplified - a full implementation would check mutual communication)
+        # Get activity around co-location for user_a
         a_records_around = [r for r in user_a.records
-                           if abs((r.datetime - meeting_time).total_seconds()) < gap_seconds]
+                           if abs((r.datetime - coloc_time).total_seconds()) < gap_seconds]
 
-        # If low activity around co-location, likely a meeting
-        activity_level = len(a_records_around)
+        # Get activity around co-location for user_b
+        b_records_around = [r for r in user_b.records
+                           if abs((r.datetime - coloc_time).total_seconds()) < gap_seconds]
 
-        meetings.append({
-            'antenna_id': coloc['antenna_id'],
-            'time': meeting_time,
-            'coordinates': coloc['coordinates'],
-            'delta_seconds': coloc['delta_seconds'],
-            'activity_around': activity_level,
-            'confidence': 'high' if activity_level < 3 else 'medium' if activity_level < 6 else 'low'
+        # Normalize coordinates
+        coord = normalize_coordinates(coloc['antenna_id'], antennas)
+
+        results.append({
+            "type": "colocation_with_context",
+            "colocation": {
+                "antenna_id": coloc['antenna_id'],
+                "coord": coord,
+                "user_a_time": coloc['user_a_time'].isoformat(),
+                "user_b_time": coloc['user_b_time'].isoformat(),
+                "delta_seconds": coloc['delta_seconds']
+            },
+            "activity_context": {
+                "user_a": {
+                    "records_around_count": len(a_records_around),
+                    "records_around": [serialize_record(r) for r in sorted(a_records_around, key=lambda x: x.datetime)],
+                    "gap_window_minutes": gap_threshold_minutes
+                },
+                "user_b": {
+                    "records_around_count": len(b_records_around),
+                    "records_around": [serialize_record(r) for r in sorted(b_records_around, key=lambda x: x.datetime)],
+                    "gap_window_minutes": gap_threshold_minutes
+                }
+            },
+            "parameters": {
+                "colocation_window_minutes": colocation_window_minutes,
+                "gap_threshold_minutes": gap_threshold_minutes
+            }
         })
 
-    return meetings
+    return results
 
 
 def multi_user_colocation(users, window_minutes=30):
@@ -350,11 +371,14 @@ def synchronized_silence(users, user_ids, min_silence_minutes=60,
 
     Investigative Value
     -------------------
-    Synchronized silence across multiple suspects may indicate:
+    Synchronized silence across multiple subjects may indicate:
     - In-person meeting (no need to call when together)
-    - Coordinated operational activity (e.g., crime commission)
+    - Coordinated operational activity
     - Deliberate communication blackout
     - Shared external event (arrest, hospitalization)
+
+    Investigators interpret what the silence means - this function only
+    provides the raw observables.
 
     Parameters
     ----------
@@ -373,23 +397,19 @@ def synchronized_silence(users, user_ids, min_silence_minutes=60,
     Returns
     -------
     list of dict
-        Each synchronized silence event with:
-        - start: datetime when overlap begins
-        - end: datetime when overlap ends
-        - duration_minutes: float
-        - participants: list of user_ids who were silent
-        - participant_count: int
-        - preceding_activity: dict mapping user_id to their last contact before silence
-        - following_activity: dict mapping user_id to their first contact after silence
-        - suspicion_score: float 0-1 based on duration and coordination
+        Data-first evidence with:
+        - type: "synchronized_silence"
+        - users: list of user_ids who were silent
+        - silence: start_ts, end_ts, duration_minutes
+        - parameters: methodology exposure
+        - support: raw observables (participant_count, total_users, start_hour, is_daytime)
+        - preceding_events: serialized last event before silence for each user
+        - following_events: serialized first event after silence for each user
 
-    Notes
-    -----
-    Suspicion score factors:
-    - Duration: Longer coordinated silences are more suspicious
-    - Participant ratio: Higher percentage of participants = more suspicious
-    - Time of day: Nighttime silences may be normal (sleeping)
+        Sorted chronologically by start time (not by any subjective score).
     """
+    from .utils import serialize_record_dict
+
     if min_participants is None:
         min_participants = len(users)
 
@@ -421,13 +441,17 @@ def synchronized_silence(users, user_ids, min_silence_minutes=60,
                         'datetime': prev_rec.datetime,
                         'correspondent_id': prev_rec.correspondent_id,
                         'interaction': prev_rec.interaction,
-                        'direction': prev_rec.direction
+                        'direction': prev_rec.direction,
+                        'call_duration': prev_rec.call_duration,
+                        'antenna_id': prev_rec.position.antenna if prev_rec.position else None
                     },
                     'first_after': {
                         'datetime': curr_rec.datetime,
                         'correspondent_id': curr_rec.correspondent_id,
                         'interaction': curr_rec.interaction,
-                        'direction': curr_rec.direction
+                        'direction': curr_rec.direction,
+                        'call_duration': curr_rec.call_duration,
+                        'antenna_id': curr_rec.position.antenna if curr_rec.position else None
                     }
                 })
 
@@ -489,48 +513,45 @@ def synchronized_silence(users, user_ids, min_silence_minutes=60,
                 duration_seconds = (overlap_end - current_overlap_start).total_seconds()
 
                 if duration_seconds >= min_overlap_seconds:
-                    # Calculate suspicion score
-                    participant_ratio = len(current_participants) / len(users)
-                    duration_hours = duration_seconds / 3600
-
-                    # Base score from duration (caps at 0.5 for 12+ hours)
-                    duration_score = min(0.5, duration_hours / 24)
-
-                    # Coordination score from participant ratio (0-0.4)
-                    coordination_score = participant_ratio * 0.4
-
-                    # Time of day factor (0-0.1): daytime silence more suspicious
-                    hour = current_overlap_start.hour
-                    if 9 <= hour <= 21:  # Daytime
-                        time_score = 0.1
-                    else:  # Nighttime (could be sleeping)
-                        time_score = 0.0
-
-                    suspicion_score = min(1.0, duration_score + coordination_score + time_score)
-
-                    # Build context
-                    preceding_activity = {}
-                    following_activity = {}
+                    # Build context with serialized events
+                    preceding_events = {}
+                    following_events = {}
                     for uid, sinfo in current_participants.items():
-                        preceding_activity[uid] = sinfo['last_before']
-                        following_activity[uid] = sinfo['first_after']
+                        preceding_events[uid] = serialize_record_dict(sinfo['last_before'])
+                        following_events[uid] = serialize_record_dict(sinfo['first_after'])
+
+                    # Raw observables for support
+                    start_hour = current_overlap_start.hour
 
                     synchronized_events.append({
-                        'start': current_overlap_start,
-                        'end': overlap_end,
-                        'duration_minutes': duration_seconds / 60,
-                        'participants': list(current_participants.keys()),
-                        'participant_count': len(current_participants),
-                        'preceding_activity': preceding_activity,
-                        'following_activity': following_activity,
-                        'suspicion_score': round(suspicion_score, 3)
+                        "type": "synchronized_silence",
+                        "users": list(current_participants.keys()),
+                        "silence": {
+                            "start_ts": current_overlap_start.isoformat(),
+                            "end_ts": overlap_end.isoformat(),
+                            "duration_minutes": duration_seconds / 60
+                        },
+                        "parameters": {
+                            "min_silence_minutes": min_silence_minutes,
+                            "min_overlap_minutes": min_overlap_minutes,
+                            "min_participants": min_participants
+                        },
+                        "support": {
+                            "participant_count": len(current_participants),
+                            "total_users": len(users),
+                            "participant_ratio": len(current_participants) / len(users),
+                            "start_hour": start_hour,
+                            "is_daytime": 9 <= start_hour <= 21
+                        },
+                        "preceding_events": preceding_events,
+                        "following_events": following_events
                     })
 
                 current_overlap_start = None
                 current_participants = {}
 
-    # Sort by suspicion score descending
-    synchronized_events.sort(key=lambda x: (-x['suspicion_score'], x['start']))
+    # Sort chronologically by start time (not by any subjective score)
+    synchronized_events.sort(key=lambda x: x['silence']['start_ts'])
 
     return synchronized_events
 
@@ -562,81 +583,89 @@ def group_locations_at_time(users, user_ids, target_datetime, window_minutes=30)
     Returns
     -------
     dict
-        user_id -> {
-            'antenna_id': str or None (antenna at/near target time),
-            'coordinates': tuple (lat, lon) or None,
-            'record_datetime': datetime (closest record found),
-            'delta_seconds': float (how far from target time),
-            'confidence': str ('high'/'medium'/'low'/None),
-            'activity_at_time': str (what were they doing - e.g., "call out"),
-            'correspondent': str (who they were communicating with)
-        }
-
-    Notes
-    -----
-    Confidence levels:
-    - 'high': Record within 5 minutes of target
-    - 'medium': Record within 15 minutes of target
-    - 'low': Record within window but > 15 minutes
-    - None: No record found within window
+        Data-first evidence structure with:
+        - type: "group_locations_at_time"
+        - target_ts: ISO timestamp of target time
+        - window_minutes: search window size
+        - users: dict of user_id -> {support, location, closest_event, events_in_window}
+        - colocation_summary: groups users by antenna for quick co-location detection
     """
+    from .utils import serialize_record, normalize_coordinates
+
     window_seconds = window_minutes * 60
-    results = {}
+    user_results = {}
 
     for user, uid in zip(users, user_ids):
         # Get antenna coordinates lookup
         antennas = user.antennas or {}
 
-        # Find the closest record to target_datetime within window
+        # Find all records in window
+        all_window_records = [r for r in user.records
+                              if abs((r.datetime - target_datetime).total_seconds()) <= window_seconds]
+
+        # Find closest record to target_datetime
         best_record = None
         best_delta = float('inf')
 
-        for r in user.records:
+        for r in all_window_records:
             delta = abs((r.datetime - target_datetime).total_seconds())
-            if delta <= window_seconds and delta < best_delta:
+            if delta < best_delta:
                 best_delta = delta
                 best_record = r
 
         if best_record is None:
-            results[uid] = {
-                'antenna_id': None,
-                'coordinates': None,
-                'record_datetime': None,
-                'delta_seconds': None,
-                'confidence': None,
-                'activity_at_time': None,
-                'correspondent': None
+            user_results[uid] = {
+                "support": {
+                    "closest_event_delta_sec": None,
+                    "events_in_window": 0,
+                    "has_location": False
+                },
+                "location": {
+                    "antenna_id": None,
+                    "coord": None
+                },
+                "closest_event": None,
+                "events_in_window": []
             }
         else:
-            # Determine confidence based on time proximity
-            if best_delta <= 300:  # 5 minutes
-                confidence = 'high'
-            elif best_delta <= 900:  # 15 minutes
-                confidence = 'medium'
-            else:
-                confidence = 'low'
-
-            # Get coordinates if antenna available
+            # Get antenna and coordinates
             antenna_id = best_record.position.antenna
-            coordinates = None
-            if antenna_id and antenna_id in antennas:
-                ant_data = antennas[antenna_id]
-                if hasattr(ant_data, 'latitude') and hasattr(ant_data, 'longitude'):
-                    coordinates = (ant_data.latitude, ant_data.longitude)
-                elif isinstance(ant_data, (list, tuple)) and len(ant_data) >= 2:
-                    coordinates = (ant_data[0], ant_data[1])
+            coord = normalize_coordinates(antenna_id, antennas) if antenna_id else None
 
-            # Build activity description
-            activity = f"{best_record.interaction} {best_record.direction}"
-
-            results[uid] = {
-                'antenna_id': antenna_id,
-                'coordinates': coordinates,
-                'record_datetime': best_record.datetime,
-                'delta_seconds': best_delta,
-                'confidence': confidence,
-                'activity_at_time': activity,
-                'correspondent': best_record.correspondent_id
+            user_results[uid] = {
+                "support": {
+                    "closest_event_delta_sec": best_delta,
+                    "events_in_window": len(all_window_records),
+                    "has_location": antenna_id is not None
+                },
+                "location": {
+                    "antenna_id": antenna_id,
+                    "coord": coord
+                },
+                "closest_event": {
+                    "ts": best_record.datetime.isoformat(),
+                    "interaction": best_record.interaction,
+                    "direction": best_record.direction,
+                    "correspondent_id": best_record.correspondent_id,
+                    "duration_sec": best_record.call_duration,
+                    "antenna_id": antenna_id
+                },
+                "events_in_window": [serialize_record(r) for r in sorted(all_window_records, key=lambda x: x.datetime)]
             }
 
-    return results
+    # Build colocation summary - group users by antenna
+    by_antenna = defaultdict(list)
+    for uid, data in user_results.items():
+        antenna_id = data["location"]["antenna_id"]
+        if antenna_id:
+            by_antenna[antenna_id].append(uid)
+
+    return {
+        "type": "group_locations_at_time",
+        "target_ts": target_datetime.isoformat(),
+        "window_minutes": window_minutes,
+        "users": user_results,
+        "colocation_summary": {
+            "by_antenna": dict(by_antenna)
+        }
+    }
