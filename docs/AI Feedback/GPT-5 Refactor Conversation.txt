@@ -1,0 +1,1019 @@
+ 
+
+I honestly don’t want a lot of fancy shit. Analysis yes but confidence, suspicious, etc. ratting are subjective and even though I want this to be investigative and eventually everything of interest will be confirmed by a human, giving confidence that…..no offence is created by AI will eventually just make this thing look stupid. Thoughts?
+ChatGPT said:
+
+Thought for 4 seconds
+I agree with your instinct, with one important nuance: the problem is not “confidence” itself—it is anthropomorphic, subjective confidence language (“high/medium/low,” “suspicion score”) that reads like an opinion engine. In investigative and evidentiary contexts, that can degrade credibility fast.
+
+You can keep the analytical value while removing the “AI judgment” vibe by switching from confidence-as-belief to confidence-as-data-quality and proximity.
+
+Why your concern is valid
+Labels like “high confidence” or “suspicion” can be interpreted as the system asserting truth or intent. That’s the wrong framing for CDR/tower-derived inference.
+
+It invites arguments like “the tool says this was suspicious,” which is not what you want to defend.
+
+You already have places where the scoring is explicitly subjective (e.g., synchronized_silence uses a “suspicion_score” with time-of-day heuristics). 
+colocation
+
+
+The middle ground that keeps rigor without “fancy shit”
+Replace subjective scores with objective qualifiers and audit fields:
+
+Replace “confidence” with “time_delta_seconds” and “window_minutes.”
+Your location query already computes delta_seconds. That single number is more defensible than “high/medium/low.” 
+location
+
+
+Action: remove the 'confidence': 'high'...' field in location_at_specific_time and group_locations_at_time and just return:
+
+record_datetime
+
+delta_seconds
+
+window_minutes
+
+maybe closest_record_count_in_window if you want.
+
+Replace “suspicion_score” with “overlap_duration_minutes” + “participant_count” + “time_of_day_bucket.”
+In synchronized_silence, the most useful elements are the overlap interval and who it affects; the scoring is optional and subjective. 
+colocation
+
+
+Action: return:
+
+duration_minutes
+
+participant_count / participants
+
+start_hour or a simple day/night label
+
+keep preceding_activity / following_activity (those are gold)
+
+Where you currently use “meeting_detection” confidence, switch to “supporting signals.”
+The current meeting_detection is explicitly a heuristic and returns a “confidence” string based only on user_a activity count around the co-location time. 
+colocation
+
+
+That’s exactly the kind of thing that will look weak under scrutiny.
+Action: instead return:
+
+activity_around_count_user_a
+
+activity_around_count_user_b (if you finish it)
+
+communications_between_pair_in_window (count)
+
+no “confidence” label at all
+
+Keep “ranking” only where it is intrinsically objective.
+Rankings like “top contacts by intensity” are fine because they are just a deterministic ordering of your defined formula; they do not claim truth/intent. 
+relationship
+
+
+But fix the doc mismatch: you mention recency then don’t implement it, and your weights comment conflicts with the actual weights used. 
+relationship
+
+
+A phrasing/fielding pattern that works well in policing contexts
+Instead of:
+
+confidence: high
+
+suspicion_score: 0.82
+
+Use:
+
+evidence_window_minutes: 30
+
+closest_event_delta_seconds: 212
+
+records_supporting: 4
+
+data_coverage_notes: "No antenna for 38% of records in window" (optional)
+
+That communicates strength of support without pretending to infer intent or truth.
+
+Recommendation for your codebase right now
+Remove confidence fields from:
+
+location_at_specific_time 
+location
+
+
+group_locations_at_time 
+colocation
+
+
+meeting_detection 
+colocation
+
+
+Remove suspicion_score entirely from synchronized_silence, and keep sorting by (duration_minutes, participant_count, start) or just chronological. 
+colocation
+
+
+If you want, I can give you a very small “mechanical” diff plan (what to rename/remove and what to replace it with) that keeps outputs stable for downstream consumption while eliminating all subjective-looking language.
+
+
+Sources
+You said:
+Can you go through every module and find where any data has that has been extracted or should be extracted and instead has been abstracted by other subjectives data. List all of it. The point of these indicators is to pull the data not to interpret it. And you are right Rankings like “top contacts by intensity” are fine because they are data they are computed and repeatable without having a subjective algorithm. Any of those can stay. But I need the data. As for the evidence_window_minutes: 30
+	•	closest_event_delta_seconds: 212
+	•	records_supporting: 4
+
+That is fine as the result output but those have to be translated into human readable data that an investigator….while very good at their job, barely finished high school many time. lol
+
+Thoughts?
+ChatGPT said:
+
+Thought for 38s
+Understood. I reviewed each code module and flagged every place where (a) a subjective label/score is being produced, or (b) raw data is being collapsed into a lossy “interpretation layer” when the underlying data is available and should be returned.
+
+Below is the complete list, by module, with what is being abstracted and what to return instead.
+
+location.py
+1) location_at_specific_time(...)
+Subjective/abstract output
+
+Returns confidence: 'high'|'medium'|'low' derived from delta_seconds. 
+location
+
+
+Return the data instead
+
+Keep delta_seconds (already present) and drop confidence.
+
+Add raw fields you already have in the record but do not return:
+
+direction (missing today; you return interaction only) 
+location
+
+
+call_duration if present (calls)
+
+2) time_at_locations(...)
+Lossy “interpretation layer”
+
+Converts hit counts into “estimated_hours” using a hardcoded heuristic (each record = 0.5 hours). 
+location
+
+
+Return the data instead
+
+Return raw hit_count per antenna and (optionally) keep the estimate as an additional field, not the only output:
+
+antenna_id -> {'hit_count': int, 'estimated_hours': float (optional), 'assumption_minutes_per_hit': 30}
+
+3) unusual_locations(...)
+Interpretive category
+
+“Unusual” is a thresholded label (“<= threshold_visits”), which is deterministic but still an interpretation (it hides the full distribution). 
+location
+
+
+Return the data instead
+
+Return the full visit histogram (all antennas with counts), and let “unusual” be a UI filter:
+
+{'antenna_id': ..., 'visit_count': ..., 'timestamps': ...} for all antennas
+
+Or keep unusual_locations but also add a location_visit_counts(...) function that returns everything.
+
+colocation.py
+1) group_locations_at_time(...)
+Subjective/abstract output
+
+Uses confidence: high/medium/low based on time distance. 
+colocation
+
+
+Builds activity_at_time as a human phrase like "call out" instead of returning raw fields. 
+colocation
+
+
+Collapses “what happened” to just correspondent (and a phrase) rather than returning the record’s structured fields.
+
+Return the data instead
+
+Drop confidence; keep delta_seconds.
+
+Replace activity_at_time with raw event fields:
+
+interaction, direction, call_duration, correspondent_id, record_datetime, antenna_id, delta_seconds
+
+If you still want a phrase for display, make it a rendering-layer concern, not the indicator return.
+
+2) meeting_detection(...)
+Subjective/interpretive output
+
+Returns confidence: 'high'|'medium'|'low' based on an “activity_level < 3/6” heuristic. 
+colocation
+
+
+The function also explicitly notes it is a simplified heuristic and not checking mutual comms, meaning the confidence label is especially risky. 
+colocation
+
+
+Return the data instead
+Return supporting observables, not a conclusion:
+
+co_location_delta_seconds (already returned as delta_seconds) 
+colocation
+
+
+activity_around_count (already activity_around) but ideally also:
+
+activity_around_records (list of serialized records within the gap window)
+
+pairwise_comms_in_window_count (A↔B within window)
+
+pairwise_comms_in_window_records (optional list)
+
+Then investigators decide whether it “looks like” a meeting.
+
+3) synchronized_silence(...)
+Subjective/interpretive output
+
+Computes a suspicion_score with a “daytime is more suspicious” factor and sorts by it. 
+colocation
+
+ 
+colocation
+
+
+Docstring explicitly frames it as “more suspicious,” which is exactly the interpretive language you want to avoid. 
+colocation
+
+
+Return the data instead
+Keep the excellent extracted data you already compute:
+
+start, end, duration_minutes, participants, participant_count, preceding_activity, following_activity 
+colocation
+
+
+Remove/replace:
+
+Remove suspicion_score
+
+Replace the internal scoring components with plain observables if you still need sorting:
+
+participant_ratio (already computed internally) 
+colocation
+
+
+start_hour or is_daytime (boolean), without any “more suspicious” semantics 
+colocation
+
+
+Sort chronologically (or by duration) rather than by a “suspicion” score.
+
+temporal.py
+This module is mostly fine (it returns objective times/counts), but there are a few places where you are returning summaries or thresholded classifications instead of raw supporting numbers.
+
+1) activity_bursts(...)
+Interpretive classification
+
+Classifies windows as “bursts” by comparing window count to an average-rate-derived threshold. 
+temporal
+
+
+Output does not include the baseline and threshold values that justify why the window was flagged. 
+temporal
+
+
+Return the data instead
+Keep the burst list if you want, but return the supporting numbers:
+
+Per burst:
+
+count, window_minutes, contacts (already) 
+temporal
+
+
+add avg_rate_per_window and threshold_count (you compute these as avg_rate and threshold) 
+temporal
+
+
+That turns “it’s a burst” into “here are the counts and the baseline used.”
+
+2) inter_event_times(records)
+Lossy abstraction
+
+Returns summary_stats(deltas) rather than the raw deltas list. 
+temporal
+
+
+Return the data instead
+
+Either return deltas outright, or return:
+
+{'deltas_seconds': [...], 'summary': summary_stats(...)}
+This preserves your ability to compute stats but keeps the underlying evidence accessible.
+
+3) activity_around_time(...)
+Mixed
+
+Returns raw Record objects in before/after rather than serialized dicts. 
+temporal
+
+
+That is not “subjective,” but it is a practical issue: it blocks easy export/reporting, and encourages ad-hoc interpretations later.
+
+Return the data instead
+
+Return serialized records (structured fields) plus the contact counters.
+
+relationship.py
+This module is largely “good” by your standards: rankings and ratios are deterministic and repeatable. The main issue here is not subjectivity, but a mismatch between what the function claims and what it returns.
+
+1) relationship_strength(...)
+Problem
+
+Docstring says the composite includes recency, and comments mention recency, but recency is not implemented. 
+relationship
+
+
+That creates interpretive ambiguity: investigators may think “recent contact” is represented when it is not.
+
+Return the data instead
+
+Either remove all recency language, or return the raw components alongside the score:
+
+{'count': ..., 'duration': ..., 'last_contact': ..., 'score': ...}
+
+This avoids the “black box score” concern while preserving ranking utility.
+
+2) reciprocity_score(...), initiation_ratio(...)
+These are deterministic ratios and already reflect data; no subjective layer to remove. 
+relationship
+
+
+network.py
+Network outputs are mostly raw counts/lists; no explicit “confidence/suspicion” fields.
+
+The only “interpretive” element is conceptual framing in docstrings (“leader/coordinator”), but the returned data itself is objective (counts, lists). Example: degree_centrality returns counts and lists. 
+network
+
+
+No changes required here on the “remove subjective abstraction” criterion.
+
+utils.py
+No subjective scoring. This is the correct place to add two things you explicitly want:
+
+Human-readable rendering helpers (for investigators)
+
+Serialization helpers so indicators return structured evidence rather than python objects or phrases
+
+Your format_duration(...) is already aligned with this goal. 
+investigation-indicators-implem…
+
+
+Your “barely finished high school” translation requirement
+You are describing a UI/reporting requirement, not an indicator requirement. The clean way to do this without “fancy shit” is:
+
+Indicators return only structured data (timestamps, ids, counts, deltas, lists of events).
+
+A separate “renderer” layer turns that data into short, plain-English sentences.
+
+Examples (using your preferred fields):
+
+window_minutes: 30 → “Search window: 30 minutes on either side of the time.”
+
+closest_event_delta_seconds: 212 → “Closest phone record is 3 minutes 32 seconds from the time.”
+
+records_supporting: 4 → “There are 4 phone records within that window.”
+
+That keeps the tool credible: it is not claiming intent or truth; it is summarizing what the data literally contains.
+
+If you want, I can propose a single, consistent output schema for “event evidence” (location hit, comm event, co-location hit) and a matching set of 10–15 rendering strings that cover 95% of what investigators need to read.
+
+
+Sources
+You said:
+Yes, please provide that for me
+ChatGPT said:
+Below is a simple, consistent, “data-first” schema you can use across all modules, plus a small set of plain-English render templates that convert the same fields into investigator-friendly statements without implying intent, “confidence,” or “suspicion.”
+
+1) Canonical schema: Evidence primitives
+1.1 Event (one CDR-style record, serialized)
+Use this everywhere you currently return a Record object or a human phrase like "call out".
+
+{
+  "event_id": "optional-stable-id-or-null",
+  "ts": "2026-01-16T14:03:21-05:00",
+  "interaction": "call|text|data|unknown",
+  "direction": "in|out|unknown",
+  "correspondent_id": "string-or-null",
+  "duration_sec": 42,
+  "antenna_id": "string-or-null"
+}
+Notes
+
+event_id can be omitted if you cannot generate one deterministically.
+
+duration_sec should be null for texts.
+
+1.2 Coord (normalized antenna coordinates)
+Do not leak tuple-vs-object variance. Always normalize to:
+
+{ "lat": 43.123456, "lon": -79.123456 }
+1.3 WindowSpec (what the system actually searched)
+Attach this to any “time-of-interest” function.
+
+{
+  "center_ts": "2026-01-16T14:00:00-05:00",
+  "before_min": 30,
+  "after_min": 30
+}
+1.4 Support (objective strength-of-support fields)
+This replaces “confidence.” It’s purely observables.
+
+{
+  "closest_event_delta_sec": 212,
+  "events_in_window": 4,
+  "has_location": true,
+  "location_event_delta_sec": 212
+}
+1.5 Coverage (data availability flags, not interpretation)
+Optional but very useful operationally.
+
+{
+  "total_events_in_window": 4,
+  "events_with_antenna": 3,
+  "missing_antenna_events": 1
+}
+2) Canonical schema: Evidence objects for your main indicator types
+2.1 Location at a specific time (location_at_specific_time)
+{
+  "type": "location_at_time",
+  "user_id": "U123",
+  "window": { "center_ts": "...", "before_min": 30, "after_min": 30 },
+  "support": { "closest_event_delta_sec": 212, "events_in_window": 4, "has_location": true, "location_event_delta_sec": 212 },
+  "location": {
+    "antenna_id": "A-991",
+    "coord": { "lat": 43.12, "lon": -79.22 }
+  },
+  "closest_event": { "ts": "...", "interaction": "call", "direction": "out", "correspondent_id": "C55", "duration_sec": 42, "antenna_id": "A-991" },
+  "events_in_window": [ { "ts": "...", "...": "..." } ],
+  "coverage": { "total_events_in_window": 4, "events_with_antenna": 3, "missing_antenna_events": 1 }
+}
+2.2 Co-location overlap between two users (antenna_overlap / multi_user_colocation)
+Represent each “hit” consistently:
+
+{
+  "type": "colocation_hit",
+  "users": ["U123", "U456"],
+  "window": { "center_ts": "optional-or-null", "before_min": 30, "after_min": 30 },
+  "hit": {
+    "start_ts": "2026-01-16T13:58:00-05:00",
+    "end_ts": "2026-01-16T14:12:00-05:00",
+    "duration_min": 14,
+    "antenna_id": "A-991",
+    "coord": { "lat": 43.12, "lon": -79.22 }
+  },
+  "support": {
+    "user_events": {
+      "U123": { "closest_event_delta_sec": 60, "events_in_window": 2, "has_location": true },
+      "U456": { "closest_event_delta_sec": 120, "events_in_window": 1, "has_location": true }
+    }
+  },
+  "evidence_events": {
+    "U123": [ { "ts": "...", "...": "..." } ],
+    "U456": [ { "ts": "...", "...": "..." } ]
+  }
+}
+2.3 Synchronized silence (group “no events” overlap)
+No suspicion scoring; just the overlap and surrounding activity.
+
+{
+  "type": "synchronized_silence",
+  "users": ["U1","U2","U3"],
+  "silence": {
+    "start_ts": "2026-01-16T11:00:00-05:00",
+    "end_ts": "2026-01-16T12:10:00-05:00",
+    "duration_min": 70
+  },
+  "parameters": {
+    "min_overlap_min": 60,
+    "gap_min": 60,
+    "context_window_min": 30
+  },
+  "support": {
+    "participants": 3,
+    "participants_total": 3
+  },
+  "preceding_events": {
+    "U1": [ { "ts": "...", "...": "..." } ],
+    "U2": [ { "ts": "...", "...": "..." } ],
+    "U3": [ { "ts": "...", "...": "..." } ]
+  },
+  "following_events": {
+    "U1": [ { "ts": "...", "...": "..." } ],
+    "U2": [ { "ts": "...", "...": "..." } ],
+    "U3": [ { "ts": "...", "...": "..." } ]
+  }
+}
+2.4 Relationship “dossier” per contact
+Keep rankings if you want, but always expose components.
+
+{
+  "type": "relationship_summary",
+  "user_id": "U123",
+  "contact_id": "C55",
+  "metrics": {
+    "total_interactions": 37,
+    "total_calls": 12,
+    "total_texts": 25,
+    "outgoing_interactions": 20,
+    "incoming_interactions": 17,
+    "reciprocity_ratio": 0.85,
+    "initiation_ratio": 0.54,
+    "total_call_duration_sec": 1800,
+    "first_contact_ts": "2025-12-02T...",
+    "last_contact_ts": "2026-01-15T..."
+  },
+  "rank_fields": {
+    "relationship_strength_score": 0.73,
+    "relationship_strength_components": {
+      "count_norm": 0.80,
+      "duration_norm": 0.60
+    }
+  }
+}
+2.5 “Time-of-interest activity” (around an event)
+{
+  "type": "activity_around_time",
+  "user_id": "U123",
+  "window": { "center_ts": "...", "before_min": 30, "after_min": 30 },
+  "support": { "events_in_window": 4, "closest_event_delta_sec": 15 },
+  "counts": { "total": 4, "calls": 1, "texts": 3, "unique_contacts": 2 },
+  "events": [ { "ts": "...", "...": "..." } ]
+}
+3) Investigator-friendly rendering templates
+These are deliberately plain, short, and “what the data shows” only.
+
+Window definition
+
+“Searched {before_min} minutes before and {after_min} minutes after {center_ts}.”
+
+Closest record delta
+
+“Closest phone record is {closest_event_delta} from the time.”
+
+Evidence count in window
+
+“Found {events_in_window} phone records in that time window.”
+
+Location availability
+
+If has location: “Closest record includes tower/location data.”
+
+If not: “No tower/location data found in the closest record.”
+
+Location at time (tower)
+
+“Closest tower near that time: {antenna_id} ({lat}, {lon}).”
+
+Co-location hit summary
+
+“Both devices used the same tower {antenna_id} from {start_ts} to {end_ts} ({duration_min} minutes).”
+
+Co-location support per user
+
+“User {user_id}: closest record is {delta} from the overlap; {n} records in the overlap window.”
+
+Synchronized silence
+
+“No phone records for all listed devices from {start_ts} to {end_ts} ({duration_min} minutes).”
+
+Context before/after silence
+
+“Within {context_window_min} minutes before the gap, {user_id} had {n} phone records.”
+
+“Within {context_window_min} minutes after the gap, {user_id} had {n} phone records.”
+
+Relationship volume
+
+“{user_id} interacted with {contact_id} {total_interactions} times ({total_calls} calls, {total_texts} texts).”
+
+Direction split
+
+“Outgoing: {outgoing_interactions}. Incoming: {incoming_interactions}.”
+
+Last contact
+
+“Most recent interaction: {last_contact_ts}.”
+
+Inter-event gap
+
+“Largest gap between records in this period: {gap_hours} hours.”
+
+Burst window (if you keep burst flags)
+
+“From {start_ts} to {end_ts}: {count} records ({unique_contacts} contacts). Baseline window count used: {threshold_count}.”
+
+Coverage note (optional)
+
+“Location data present on {events_with_antenna} of {total_events_in_window} records in the window.”
+
+Implementation note: make these renderers a separate layer (e.g., render.py) that takes an evidence object and produces one or more strings. Indicators stay “raw data only.”
+
+4) Minimal “no fancy” rule-set for your codebase
+Indicators must not output: confidence, suspicion, likely, probably, meeting, coordinated.
+
+Indicators may output: counts, deltas, durations, timestamps, IDs, normalized coordinates, and the actual records that support those numbers.
+
+Renderers may say: “closest,” “within X minutes,” “found N records,” “same tower,” and nothing about intent.
+
+If you want, I can also provide a small mapping table from each current function to one of the evidence object types above (so refactoring is mechanical), but the schema and templates above are sufficient to standardize everything without introducing subjective interpretation.
+
+You said:
+One more thing wouldn’t hurt a small mapping table would be great
+ChatGPT said:
+Below is a compact “mechanical refactor” mapping table from your current functions to the standardized Evidence object types I proposed, plus the key fields to keep and the fields to remove/relocate to the renderer layer.
+
+Mapping table: module → function → evidence type
+location.py
+Function	Evidence type	Keep / add (data)	Remove / move to renderer
+location_timeline(user, …)	location_timeline (list of Event + optional coords)	serialize events: ts, antenna_id, coord(if available); also include interaction, direction, correspondent_id, duration_sec if you want comm context	any “interpretation” about why location changed
+most_visited_locations(user, …)	location_histogram	return full {antenna_id: visit_count} plus optional coord	none (ranking is fine)
+unusual_locations(user, threshold_visits=…)	location_histogram + optional filter	return full histogram; optionally include unusual_subset as derived list	“unusual” should be a UI filter, not the only output
+transitions(user, …)	location_transitions	return raw transitions: from_antenna, to_antenna, start_ts, end_ts, distance_km(if coords)	none
+great_circle_distance(coord_a, coord_b)	utility	keep	n/a
+time_at_locations(user, …)	location_histogram (counts)	return hit_count (raw); optionally include assumption_minutes_per_hit and derived hours	avoid returning only “estimated_hours”
+location_at_specific_time(user, target_time, window_minutes=…)	location_at_time	keep window, closest_event_delta_sec, events_in_window, closest_event, location{antenna_id, coord}; add coverage	remove confidence
+locations_in_time_range(user, start, end)	location_events_in_range	return events (serialized) + optional grouped-by-antenna counts	none
+colocation.py
+Function	Evidence type	Keep / add (data)	Remove / move to renderer
+antenna_overlap(user_a, user_b, time_window_minutes=…)	colocation_hit (list)	keep time_a, time_b, antenna_id, delta_seconds; add hit.start_ts/end_ts if you compute; normalize coord; include evidence_events per user	none, except ensure no “confidence” language
+travel_pattern_match(user_a, user_b, time_window_minutes=…)	travel_match_hit	return matched transitions with raw times, from/to towers, deltas	any “this means they traveled together” phrasing
+group_locations_at_time(users, target_time, …)	location_at_time (per user)	keep closest_event_delta_sec, closest_event, events_in_window, location	remove confidence; replace activity_at_time phrase with serialized Event
+meeting_detection(user_a, user_b, …)	colocation_context	return colocation_hit + activity_around_records + pairwise_comms_records (if implemented) + counts	remove confidence and “meeting” implication; rename function if you keep it (e.g., colocation_with_activity_context)
+multi_user_colocation(users, …)	colocation_cluster	keep clusters: participants, antenna_id, start_ts/end_ts, duration_min; include per-user evidence events	any “meeting”/intent terms
+synchronized_silence(users, …)	synchronized_silence	keep start/end/duration, participants, preceding_events, following_events, params	remove suspicion_score and “more suspicious” framing
+temporal.py
+Function	Evidence type	Keep / add (data)	Remove / move to renderer
+hourly_activity(user, …)	temporal_profile_hourly	keep counts per hour; optionally split call/text/in/out	none
+communication_gaps(user, min_gap_hours=…)	temporal_gaps	keep each gap: start_ts/end_ts/duration_hours, optionally adjacent events	none
+activity_bursts(user, window_minutes=…, burst_threshold=…)	temporal_bursts	keep burst windows and add baseline_rate + threshold_count used	avoid presenting as “anomaly” without the baseline fields
+inter_event_times(records, …)	inter_event_times	return deltas_seconds plus optional summaries	do not return summary-only if the goal is “pull data”
+active_days(user)	active_days	keep list of dates + counts	none
+activity_around_time(user, time_point, …)	activity_around_time	keep counts + return events serialized	do not return raw objects if you need exportability
+first_contact_after_time(user, time_point, …)	first_contact_after_time	return the first Event (serialized) + delta from time_point	none
+relationship.py
+Function	Evidence type	Keep / add (data)	Remove / move to renderer
+relationship_strength(user, …)	relationship_strength_components	keep score and return components: counts, duration_sec, last_contact_ts	remove recency claims unless implemented
+reciprocity_score(user, contact_id, …)	relationship_metric	keep raw in/out counts + ratio	none
+initiation_ratio(user, contact_id, …)	relationship_metric	keep initiations + total + ratio	none
+first_contact_of_day(user, …)	daily_first_last_contact	return per-day first contact event (serialized)	none
+last_contact_of_day(user, …)	daily_first_last_contact	return per-day last contact event (serialized)	none
+contact_interaction_summary(user, …)	relationship_summary	keep everything; ensure timestamps included and consistently named	none
+network.py
+Function	Evidence type	Keep / add (data)	Remove / move to renderer
+build_communication_matrix(users, …)	network_matrix	keep {from: {to: count}} plus optional time range	none
+degree_centrality(users, …)	network_degree	keep counts + inbound/outbound neighbor lists	avoid role labels (“leader”) in any rendered text
+shared_contacts(users, …)	shared_contacts	keep contact → user list + counts	none
+communication_chains(users, time_window_minutes=…)	communication_chains	keep chain events with timestamps and participants + supporting events	avoid “coordination” language in output
+network_evolution_over_time(users, window_days=…)	network_evolution	keep snapshots of counts	none
+bridge_identification(users, …)	network_bridges	keep objective bridging stats (paths/links)	avoid interpretive naming in renderer
+utils.py
+Function	Role	Suggested additions
+records_in_window, records_around_time	core support	keep
+format_duration	renderer helper	keep; add format_delta_seconds
+resolve_contacts	output hygiene	make recursive to handle nested dict/list outputs
+(new) serialize_record(record)	serialization	standardize Event creation
+(new) get_coordinates(user, antenna_id)	normalization	standardize Coord extraction everywhere
+Practical refactor order (lowest effort, highest impact)
+Replace every return of confidence / suspicion_score with raw support fields (closest_event_delta_sec, events_in_window, etc.).
+
+Add serialize_record and use it wherever you currently return a Record object or a phrase like "call out".
+
+Normalize coordinates via get_coordinates.
+
+Rename meeting_detection to something non-interpretive (or keep name internal but output non-interpretive evidence-only payloads).
+
+If you want, I can also provide a single “EvidenceRenderer” outline (function signatures + where each template plugs in) that matches this mapping exactly.
+
+You said:
+That would be perfect
+ChatGPT said:
+Below is a concrete “EvidenceRenderer” outline you can drop into your project as a separate layer (e.g., render.py). It is intentionally plain: it turns your evidence objects into short, readable sentences and never introduces intent language (“meeting,” “suspicious,” “likely,” “confidence”).
+
+render.py design goals
+Input: evidence objects (dicts) produced by indicators.
+
+Output: a small, ordered list of strings suitable for a report panel, PDF export, or clipboard copy.
+
+Rule: render only what is explicitly present in the evidence payload; do not infer.
+
+1) Suggested public API
+from typing import Any, Dict, List, Optional, Callable
+
+Evidence = Dict[str, Any]
+
+def render_evidence(e: Evidence) -> List[str]:
+    """
+    Main entry point. Dispatches on e['type'] and returns human-readable lines.
+    """
+    ...
+
+def render_evidence_compact(e: Evidence) -> str:
+    """
+    One-liner summary; good for table cells or quick lists.
+    """
+    ...
+Dispatch table (simple and maintainable)
+_RENDERERS: Dict[str, Callable[[Evidence], List[str]]] = {
+    "location_at_time": render_location_at_time,
+    "activity_around_time": render_activity_around_time,
+    "colocation_hit": render_colocation_hit,
+    "colocation_cluster": render_colocation_cluster,
+    "synchronized_silence": render_synchronized_silence,
+    "relationship_summary": render_relationship_summary,
+    "temporal_gaps": render_temporal_gaps,
+    "temporal_bursts": render_temporal_bursts,
+    # Add more as you standardize evidence types.
+}
+2) Shared formatting helpers (keep it readable)
+from datetime import datetime, timezone
+
+def _fmt_ts(ts: Optional[str]) -> str:
+    if not ts:
+        return "unknown time"
+    # Assume ISO-8601; do not re-timezone unless you control it.
+    return ts.replace("T", " ").replace(":00-05:00", " (ET)").replace("-05:00", " (ET)")
+
+def _fmt_delta_seconds(sec: Optional[int]) -> str:
+    if sec is None:
+        return "unknown"
+    sec = abs(int(sec))
+    m, s = divmod(sec, 60)
+    h, m = divmod(m, 60)
+    if h:
+        return f"{h}h {m}m {s}s"
+    if m:
+        return f"{m}m {s}s"
+    return f"{s}s"
+
+def _fmt_minutes(mins: Optional[float]) -> str:
+    if mins is None:
+        return "unknown"
+    mins = float(mins)
+    if mins >= 60:
+        h = int(mins // 60)
+        m = int(round(mins % 60))
+        return f"{h}h {m}m" if m else f"{h}h"
+    return f"{int(round(mins))}m"
+
+def _fmt_coord(coord: Optional[dict]) -> str:
+    if not coord:
+        return "no coordinates"
+    lat = coord.get("lat")
+    lon = coord.get("lon")
+    if lat is None or lon is None:
+        return "no coordinates"
+    return f"{lat:.6f}, {lon:.6f}"
+
+def _safe_int(x: Any, default: int = 0) -> int:
+    try:
+        return int(x)
+    except Exception:
+        return default
+3) Evidence renderers (by evidence type)
+3.1 location_at_time
+Expected evidence fields (from the schema you approved):
+
+user_id
+
+window.center_ts / before_min / after_min
+
+support.closest_event_delta_sec, support.events_in_window, support.has_location
+
+location.antenna_id, location.coord
+
+closest_event (serialized event)
+
+coverage (optional)
+
+def render_location_at_time(e: Evidence) -> List[str]:
+    user_id = e.get("user_id", "unknown user")
+    w = e.get("window", {}) or {}
+    s = e.get("support", {}) or {}
+    loc = e.get("location", {}) or {}
+    cov = e.get("coverage", {}) or {}
+
+    lines: List[str] = []
+    lines.append(f"User: {user_id}")
+    lines.append(
+        f"Searched {w.get('before_min', '?')} min before and {w.get('after_min', '?')} min after {_fmt_ts(w.get('center_ts'))}."
+    )
+
+    lines.append(
+        f"Found {_safe_int(s.get('events_in_window'))} phone records in that window; closest record is {_fmt_delta_seconds(s.get('closest_event_delta_sec'))} from the time."
+    )
+
+    antenna_id = loc.get("antenna_id")
+    coord = loc.get("coord")
+    if antenna_id:
+        lines.append(f"Closest tower near that time: {antenna_id} ({_fmt_coord(coord)}).")
+    else:
+        lines.append("No tower/location data available near that time.")
+
+    # Optional: coverage note (still data-first)
+    total = cov.get("total_events_in_window")
+    with_ant = cov.get("events_with_antenna")
+    if total is not None and with_ant is not None:
+        lines.append(f"Location data present on {with_ant} of {total} records in the window.")
+
+    # Optional: closest event summary (still factual)
+    ce = e.get("closest_event") or {}
+    if ce.get("ts"):
+        lines.append(_render_event_line(ce))
+
+    return lines
+
+def _render_event_line(ev: Evidence) -> str:
+    parts = [
+        f"Closest record: {_fmt_ts(ev.get('ts'))}",
+        f"{ev.get('interaction','unknown')}",
+        f"{ev.get('direction','unknown')}",
+    ]
+    if ev.get("correspondent_id"):
+        parts.append(f"with {ev['correspondent_id']}")
+    if ev.get("duration_sec") is not None:
+        parts.append(f"duration {ev['duration_sec']}s")
+    if ev.get("antenna_id"):
+        parts.append(f"tower {ev['antenna_id']}")
+    return " | ".join(parts)
+3.2 colocation_hit
+Expected evidence fields:
+
+users (two IDs)
+
+hit.start_ts / end_ts / duration_min / antenna_id / coord
+
+support.user_events.{user_id}.closest_event_delta_sec / events_in_window
+
+evidence_events (optional lists)
+
+def render_colocation_hit(e: Evidence) -> List[str]:
+    users = e.get("users") or []
+    u1 = users[0] if len(users) > 0 else "user_1"
+    u2 = users[1] if len(users) > 1 else "user_2"
+
+    hit = e.get("hit", {}) or {}
+    support = e.get("support", {}) or {}
+    per_user = (support.get("user_events", {}) or {})
+
+    lines: List[str] = []
+    lines.append(f"Users: {u1} and {u2}")
+
+    antenna = hit.get("antenna_id", "unknown tower")
+    start_ts = _fmt_ts(hit.get("start_ts"))
+    end_ts = _fmt_ts(hit.get("end_ts"))
+    dur = _fmt_minutes(hit.get("duration_min"))
+    coord = _fmt_coord(hit.get("coord"))
+
+    lines.append(f"Same tower: {antenna} ({coord}).")
+    lines.append(f"Overlap interval: {start_ts} to {end_ts} (duration {dur}).")
+
+    # Per-user support (purely factual)
+    for uid in [u1, u2]:
+        pu = per_user.get(uid, {}) or {}
+        lines.append(
+            f"{uid}: closest record is {_fmt_delta_seconds(pu.get('closest_event_delta_sec'))} from overlap; "
+            f"{_safe_int(pu.get('events_in_window'))} records in overlap window."
+        )
+
+    return lines
+3.3 colocation_cluster (multi-user)
+def render_colocation_cluster(e: Evidence) -> List[str]:
+    hit = e.get("hit", {}) or {}
+    users = e.get("users") or []
+    antenna = hit.get("antenna_id", "unknown tower")
+
+    lines: List[str] = []
+    lines.append(f"Participants ({len(users)}): {', '.join(users) if users else 'none listed'}")
+    lines.append(f"Tower: {antenna} ({_fmt_coord(hit.get('coord'))}).")
+    lines.append(
+        f"Interval: {_fmt_ts(hit.get('start_ts'))} to {_fmt_ts(hit.get('end_ts'))} "
+        f"(duration {_fmt_minutes(hit.get('duration_min'))})."
+    )
+    return lines
+3.4 synchronized_silence
+def render_synchronized_silence(e: Evidence) -> List[str]:
+    users = e.get("users") or []
+    silence = e.get("silence", {}) or {}
+    params = e.get("parameters", {}) or {}
+
+    lines: List[str] = []
+    lines.append(f"Devices: {', '.join(users) if users else 'none listed'}")
+    lines.append(
+        f"No phone records for all listed devices from {_fmt_ts(silence.get('start_ts'))} "
+        f"to {_fmt_ts(silence.get('end_ts'))} (duration {_fmt_minutes(silence.get('duration_min'))})."
+    )
+
+    # Parameters are still factual and help the investigator understand “what was searched”
+    if params:
+        lines.append(
+            f"Parameters: min overlap {params.get('min_overlap_min','?')}m; gap {params.get('gap_min','?')}m; "
+            f"context window {params.get('context_window_min','?')}m."
+        )
+
+    # Context counts (keep it simple)
+    preceding = e.get("preceding_events", {}) or {}
+    following = e.get("following_events", {}) or {}
+    for uid in users:
+        pre_n = len(preceding.get(uid, []) or [])
+        post_n = len(following.get(uid, []) or [])
+        lines.append(f"{uid}: {pre_n} records before gap; {post_n} records after gap (within context window).")
+
+    return lines
+3.5 activity_around_time
+def render_activity_around_time(e: Evidence) -> List[str]:
+    user_id = e.get("user_id", "unknown user")
+    w = e.get("window", {}) or {}
+    s = e.get("support", {}) or {}
+    counts = e.get("counts", {}) or {}
+
+    lines: List[str] = []
+    lines.append(f"User: {user_id}")
+    lines.append(
+        f"Window: {w.get('before_min','?')} min before and {w.get('after_min','?')} min after {_fmt_ts(w.get('center_ts'))}."
+    )
+    lines.append(
+        f"Records in window: {_safe_int(s.get('events_in_window'))}; closest record is {_fmt_delta_seconds(s.get('closest_event_delta_sec'))} from the time."
+    )
+    lines.append(
+        f"Breakdown: {counts.get('calls',0)} calls, {counts.get('texts',0)} texts, {counts.get('unique_contacts',0)} unique contacts."
+    )
+    return lines
+3.6 relationship_summary
+def render_relationship_summary(e: Evidence) -> List[str]:
+    user_id = e.get("user_id", "unknown user")
+    contact_id = e.get("contact_id", "unknown contact")
+    m = e.get("metrics", {}) or {}
+    rank = e.get("rank_fields", {}) or {}
+
+    lines: List[str] = []
+    lines.append(f"User: {user_id} | Contact: {contact_id}")
+    lines.append(
+        f"Total interactions: {m.get('total_interactions',0)} "
+        f"({m.get('total_calls',0)} calls, {m.get('total_texts',0)} texts)."
+    )
+    lines.append(
+        f"Direction: outgoing {m.get('outgoing_interactions',0)}, incoming {m.get('incoming_interactions',0)}."
+    )
+    if m.get("first_contact_ts"):
+        lines.append(f"First observed interaction: {_fmt_ts(m.get('first_contact_ts'))}.")
+    if m.get("last_contact_ts"):
+        lines.append(f"Most recent interaction: {_fmt_ts(m.get('last_contact_ts'))}.")
+
+    # Ranking is allowed if it is deterministic; present it as a computed index, not an interpretation.
+    if "relationship_strength_score" in rank:
+        lines.append(f"Computed contact-intensity index: {rank.get('relationship_strength_score')} (deterministic).")
+
+    return lines
+4) Compact renderer (one line)
+def render_evidence_compact(e: Evidence) -> str:
+    t = e.get("type", "unknown")
+    if t == "location_at_time":
+        loc = e.get("location", {}) or {}
+        s = e.get("support", {}) or {}
+        return (
+            f"{e.get('user_id','user')} | tower {loc.get('antenna_id','n/a')} | "
+            f"closest delta {_fmt_delta_seconds(s.get('closest_event_delta_sec'))}"
+        )
+    if t == "colocation_hit":
+        hit = e.get("hit", {}) or {}
+        users = e.get("users") or []
+        return (
+            f"{'/'.join(users) if users else 'users'} | tower {hit.get('antenna_id','n/a')} | "
+            f"{_fmt_ts(hit.get('start_ts'))}–{_fmt_ts(hit.get('end_ts'))}"
+        )
+    if t == "synchronized_silence":
+        sil = e.get("silence", {}) or {}
+        return f"Silence | {_fmt_ts(sil.get('start_ts'))}–{_fmt_ts(sil.get('end_ts'))} | {_fmt_minutes(sil.get('duration_min'))}"
+    return f"{t}"
+5) How this plugs into your existing indicators
+Mechanically:
+
+Indicators return evidence dicts with type + data fields.
+
+UI/report export calls render_evidence(e) to display.
+
+If you need tables, use render_evidence_compact(e) as the “summary column.”
+
+This keeps your indicators strictly “pull data, don’t interpret,” while still producing investigator-friendly output.
+
+6) Optional: “Renderer hygiene” rules (recommended)
+Never use words: confidence, suspicious, likely, probably, meeting, coordinated.
+
+Allowed words: found, within, closest, same tower, records, window, duration, count.
+
+If something is missing: say “unknown” or “no data present”, not guesses.
+
+If you want, I can tailor the exact field names to the ones you already return today (so the refactor is mostly search-and-replace), but the outline above is ready to implement as-is once you standardize evidence payloads to the agreed schema.
+
